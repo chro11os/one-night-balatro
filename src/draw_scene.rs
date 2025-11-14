@@ -1,3 +1,7 @@
+fn draw_cards()
+{
+    
+}
 
 fn draw_game() 
 {

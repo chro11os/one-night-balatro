@@ -20,6 +20,5 @@ pub fn initialize_window()
         d.draw_fps(205,360);
 
         d.draw_text("One Night Balatro" ,300, 360,4, Color::BLACK);
-        
     }
 }
