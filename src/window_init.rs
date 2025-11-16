@@ -12,7 +12,7 @@ pub fn initialize_window()
         .build();
 
     rl.set_target_fps(target_fps as u32);
-
+    
     while !rl.window_should_close()
     {
         let mut d = rl.begin_drawing(&thread);
