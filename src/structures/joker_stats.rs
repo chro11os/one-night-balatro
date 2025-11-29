@@ -1,5 +1,5 @@
 #[derive(Debug)]
-pub struct joker_base_stats
+pub struct joker_base_modifiers
 {
     pub joker_name: String,
     pub mult:i32,

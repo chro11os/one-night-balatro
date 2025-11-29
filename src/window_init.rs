@@ -1,24 +1,18 @@
-use raylib::ffi::SetTargetFPS;
 use raylib::prelude::*;
-pub fn initialize_window()
-{
-    let screen_height:u16 = 410;
-    let screen_width:u16 = 720;
-    let target_fps:u8 = 60;
+
+// Returns the Handle/Thread so main.rs can run the loop
+pub fn initialize_window() -> (RaylibHandle, RaylibThread) {
+    let screen_width = 1280;
+    let screen_height = 720;
+    let target_fps = 60;
 
     let (mut rl, thread) = raylib::init()
-        .size(screen_width as i32, screen_height as i32)
-        .title("Test Window")
+        .size(screen_width, screen_height)
+        .title("One Night Balatro - Optimized")
+        .msaa_4x() // Smooths the rounded rectangles
         .build();
 
-    rl.set_target_fps(target_fps as u32);
-    
-    while !rl.window_should_close()
-    {
-        let mut d = rl.begin_drawing(&thread);
-        d.clear_background(Color::RAYWHITE);
-        d.draw_fps(205,360);
+    rl.set_target_fps(target_fps);
 
-        d.draw_text("One Night Balatro" ,300, 360,4, Color::BLACK);
-    }
+    (rl, thread)
 }
