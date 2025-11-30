@@ -1,10 +1,37 @@
 use raylib::prelude::*;
 use crate::structures::hand::HandRank;
+use crate::structures::state::GameState;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SortMode {
     Rank,
     Suit,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BossAbility {
+    None,
+    SilenceSuit(i32),
+    HandSizeMinusOne,
+    DoubleTarget,
+    PayToDiscard,
+}
+
+// NEW: Categorize Runes
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RuneType {
+    Red,   // Aggro/Power
+    Blue,  // Utility/Eco
+    Green, // Shop/Meta
+    Minor, // Stat Shards
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Rune {
+    pub name: String,
+    pub description: String,
+    pub id: i32,
+    pub rune_type: RuneType,
 }
 
 #[derive(Debug)]
@@ -16,6 +43,18 @@ pub struct FloatingText {
     pub size: i32,
     pub life: f32,
     pub max_life: f32,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Particle {
+    pub pos: Vector2,
+    pub vel: Vector2,
+    pub color: Color,
+    pub size: f32,
+    pub life: f32,
+    pub max_life: f32,
+    pub rotation: f32,
+    pub rot_speed: f32,
 }
 
 #[derive(Debug)]
@@ -34,6 +73,11 @@ pub struct BaseModifiers {
     pub round: i32,
     pub hand_rank: Option<HandRank>,
     pub hand_size: i32,
+    pub joker_slots: i32,
+
+    // New Mechanics Support
+    pub shop_price_mult: f32, // For Merchant Rune
+    pub ante_scaling: f32,    // For Evolution Rune
 
     // RPG Stats
     pub level: i32,
@@ -46,26 +90,57 @@ pub struct BaseModifiers {
     pub xp: i32,
     pub xp_target: i32,
     pub stat_points: i32,
+    pub enemies_defeated: i32,
 
     // Enemy Stats
     pub enemy_name: String,
     pub enemy_damage: i32,
     pub is_crit_active: bool,
+    pub active_ability: BossAbility,
 
-    // Visual Effects
+    // VFX
     pub floating_texts: Vec<FloatingText>,
+    pub particles: Vec<Particle>,
 
-    // Scoring Sequence Logic
     pub score_timer: f32,
     pub score_index: usize,
     pub score_delay: f32,
-
-    // NEW: Sorting State
     pub current_sort: SortMode,
+
+    pub previous_state: GameState,
+    pub round_won: bool,
+
+    // Rune State
+    pub equipped_runes: Vec<Rune>,
+    pub available_runes: Vec<Rune>,
+    pub max_runes: usize,
 }
 
 impl Default for BaseModifiers {
     fn default() -> Self {
+        // --- DEFINE RUNES ---
+        let mut available_runes = Vec::new();
+
+        // RED RUNES (Power/Aggro) - IDs 1-3
+        available_runes.push(Rune { name: "Reaper".to_string(), description: "Steal 1 HP per enemy. Scales (+1/+2 Boss). Reduced Max HP.".to_string(), id: 1, rune_type: RuneType::Red });
+        available_runes.push(Rune { name: "Judgement".to_string(), description: "Balances Chips/Mult. Double Enemy HP.".to_string(), id: 2, rune_type: RuneType::Red });
+        available_runes.push(Rune { name: "Paladin".to_string(), description: "+40 Max HP. Reduced Mult/Chips.".to_string(), id: 3, rune_type: RuneType::Red });
+
+        // BLUE RUNES (Utility/Eco) - IDs 4-6
+        available_runes.push(Rune { name: "Midas".to_string(), description: "+25% Gold on Win, -25% Gold on Loss.".to_string(), id: 4, rune_type: RuneType::Blue });
+        available_runes.push(Rune { name: "Greed".to_string(), description: "+1 Hand, +1 Discard. -1 Joker Slot.".to_string(), id: 5, rune_type: RuneType::Blue });
+        available_runes.push(Rune { name: "Investment".to_string(), description: "Gold gain scales x2 per kill. Less gold early.".to_string(), id: 6, rune_type: RuneType::Blue });
+
+        // GREEN RUNES (Shop/Meta) - IDs 7-9
+        available_runes.push(Rune { name: "Merchant".to_string(), description: "+1 free joker per shop. Shop cost 1.2x more.".to_string(), id: 7, rune_type: RuneType::Green });
+        available_runes.push(Rune { name: "Mentalist".to_string(), description: "+1 free Enhancement Ore. Ores cost double.".to_string(), id: 8, rune_type: RuneType::Green });
+        available_runes.push(Rune { name: "Evolution".to_string(), description: "+1 free Rare Joker per ante. Ante scales faster.".to_string(), id: 9, rune_type: RuneType::Green });
+
+        // MINOR RUNES (Stats) - IDs 100+
+        available_runes.push(Rune { name: "Force".to_string(), description: "+10 Mult.".to_string(), id: 100, rune_type: RuneType::Minor });
+        available_runes.push(Rune { name: "Flow".to_string(), description: "+10 Chips.".to_string(), id: 101, rune_type: RuneType::Minor });
+        available_runes.push(Rune { name: "Wealth".to_string(), description: "+3 Gold.".to_string(), id: 102, rune_type: RuneType::Minor });
+
         Self {
             mult: 0,
             chips: 0,
@@ -80,6 +155,10 @@ impl Default for BaseModifiers {
             round: 1,
             hand_rank: None,
             hand_size: 7,
+            joker_slots: 5,
+
+            shop_price_mult: 1.0,
+            ante_scaling: 1.5, // Default scaling
 
             level: 1,
             current_hp: 20,
@@ -90,19 +169,26 @@ impl Default for BaseModifiers {
             xp: 0,
             xp_target: 100,
             stat_points: 0,
+            enemies_defeated: 0,
 
             enemy_name: "Training Dummy".to_string(),
             enemy_damage: 5,
             is_crit_active: false,
+            active_ability: BossAbility::None,
 
             floating_texts: Vec::new(),
+            particles: Vec::new(),
 
             score_timer: 0.0,
             score_index: 0,
             score_delay: 0.0,
-
-            // Default Sort
             current_sort: SortMode::Rank,
+            previous_state: GameState::Menu,
+            round_won: false,
+
+            equipped_runes: Vec::new(),
+            available_runes,
+            max_runes: 4, // 1 Red, 1 Blue, 1 Green, 1 Minor
         }
     }
 }

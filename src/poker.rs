@@ -2,7 +2,9 @@ use crate::structures::card::Card;
 use crate::structures::hand::HandRank;
 use std::collections::HashMap;
 
-// --- Helper Functions ---
+// ... [get_counts, is_flush, is_straight, get_hand_base_score, get_card_chip_value remain exactly the same] ...
+// (Paste previous helper functions here if replacing file, or append this new function)
+
 fn get_counts(hand: &[Card]) -> HashMap<i32, i32> {
     let mut counts = HashMap::new();
     for card in hand {
@@ -31,14 +33,12 @@ fn is_straight(hand: &[Card]) -> bool {
             break;
         }
     }
-    // Ace-low straight (A, 2, 3, 4, 5)
     if !straight && values.contains(&14) && values.contains(&2) && values.contains(&3) && values.contains(&4) && values.contains(&5) {
         straight = true;
     }
     straight
 }
 
-// UPDATE: Added this function to map HandRank to base Chips and Mult
 pub fn get_hand_base_score(rank: HandRank) -> (i32, i32) {
     match rank {
         HandRank::HighCard => (5, 1),
@@ -53,12 +53,11 @@ pub fn get_hand_base_score(rank: HandRank) -> (i32, i32) {
     }
 }
 
-// UPDATE: Added this function to get individual card chip values (J,Q,K = 10, A = 11)
 pub fn get_card_chip_value(card: &Card) -> i32 {
     match card.value {
-        14 => 11,           // Ace
-        11 | 12 | 13 => 10, // Face cards
-        v => v,             // Number cards
+        14 => 11,
+        11 | 12 | 13 => 10,
+        v => v,
     }
 }
 
@@ -69,7 +68,6 @@ pub fn get_hand_rank(hand: &[Card]) -> HandRank {
 
     if straight && flush { return HandRank::StraightFlush; }
 
-    // UPDATE: Reordered checks slightly to ensure FourOfAKind catches before FullHouse/ThreeOfAKind
     let mut pairs = 0;
     let mut threes = 0;
     let mut fours = 0;
@@ -92,4 +90,84 @@ pub fn get_hand_rank(hand: &[Card]) -> HandRank {
     if pairs == 1 { return HandRank::Pair; }
 
     HandRank::HighCard
+}
+
+// NEW: Helper to identify which cards actully contribute to the hand
+pub fn get_scoring_ids(hand: &[Card]) -> Vec<i32> {
+    let rank = get_hand_rank(hand);
+    let counts = get_counts(hand);
+    let mut ids = Vec::new();
+
+    match rank {
+        HandRank::StraightFlush | HandRank::Flush => {
+            // For flush, we take the cards matching the dominant suit (should be all if is_flush is true)
+            // But strict Balatro rules: Top 5 scoring cards if > 5.
+            // Simplified: If it's a flush, all selected matching suit count.
+            if let Some(suit) = hand.first().map(|c| c.suit) {
+                // Sort by value desc to pick top 5 if we implemented >5 card selection later
+                let mut flush_cards: Vec<&Card> = hand.iter().filter(|c| c.suit == suit).collect();
+                flush_cards.sort_by(|a, b| b.value.cmp(&a.value));
+                for card in flush_cards.iter().take(5) {
+                    ids.push(card.id);
+                }
+            }
+        }
+        HandRank::Straight => {
+            // Find the 5 cards making the straight
+            let mut values: Vec<i32> = hand.iter().map(|c| c.value).collect();
+            values.sort();
+            values.dedup();
+
+            // Logic to find the specific straight sequence
+            // (Simplified: if it is a straight, taking the straight cards)
+            // Ideally we iterate windows.
+            // For One Night Balatro MVP: If straight, take all unique cards involved.
+            for card in hand {
+                ids.push(card.id); // In a 5-card straight select, all valid.
+            }
+        }
+        HandRank::FourOfAKind => {
+            for card in hand {
+                if *counts.get(&card.value).unwrap_or(&0) == 4 {
+                    ids.push(card.id);
+                }
+            }
+        }
+        HandRank::FullHouse => {
+            for card in hand {
+                let c = *counts.get(&card.value).unwrap_or(&0);
+                if c == 3 || c == 2 {
+                    ids.push(card.id);
+                }
+            }
+        }
+        HandRank::ThreeOfAKind => {
+            for card in hand {
+                if *counts.get(&card.value).unwrap_or(&0) == 3 {
+                    ids.push(card.id);
+                }
+            }
+        }
+        HandRank::TwoPair => {
+            for card in hand {
+                if *counts.get(&card.value).unwrap_or(&0) == 2 {
+                    ids.push(card.id);
+                }
+            }
+        }
+        HandRank::Pair => {
+            for card in hand {
+                if *counts.get(&card.value).unwrap_or(&0) == 2 {
+                    ids.push(card.id);
+                }
+            }
+        }
+        HandRank::HighCard => {
+            // Only the single highest card scores
+            if let Some(max_card) = hand.iter().max_by_key(|c| c.value) {
+                ids.push(max_card.id);
+            }
+        }
+    }
+    ids
 }

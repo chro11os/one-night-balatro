@@ -8,8 +8,9 @@ pub struct GameAssets {
     pub tex_btn_discard: Texture2D,
     pub tex_btn_plus_active: Texture2D,
     pub tex_btn_plus_disabled: Texture2D,
-    // NEW: Blue Panel for Enemy Info
     pub tex_panel_blue: Texture2D,
+    // NEW: Orange Panel
+    pub tex_panel_orange: Texture2D,
 }
 
 impl GameAssets {
@@ -33,29 +34,26 @@ impl GameAssets {
         }
 
         let banner_path = "assets/ui/UI_Flat_Banner04a.png";
-        let tex_banner = rl.load_texture(thread, banner_path)
-            .expect("Failed to load UI banner");
+        let tex_banner = rl.load_texture(thread, banner_path).expect("Failed to load UI banner");
 
         let play_path = "assets/ui/UI_Flat_Bar10a.png";
-        let tex_btn_play = rl.load_texture(thread, play_path)
-            .expect("Failed to load Play button");
+        let tex_btn_play = rl.load_texture(thread, play_path).expect("Failed to load Play button");
 
         let disc_path = "assets/ui/UI_Flat_Bar07a.png";
-        let tex_btn_discard = rl.load_texture(thread, disc_path)
-            .expect("Failed to load Discard button");
+        let tex_btn_discard = rl.load_texture(thread, disc_path).expect("Failed to load Discard button");
 
         let plus_act_path = "assets/ui/UI_Flat_FrameSlot03a.png";
-        let tex_btn_plus_active = rl.load_texture(thread, plus_act_path)
-            .expect("Failed to load Plus Active button");
+        let tex_btn_plus_active = rl.load_texture(thread, plus_act_path).expect("Failed to load Plus Active");
 
         let plus_dis_path = "assets/ui/UI_Flat_FrameSlot01c.png";
-        let tex_btn_plus_disabled = rl.load_texture(thread, plus_dis_path)
-            .expect("Failed to load Plus Disabled button");
+        let tex_btn_plus_disabled = rl.load_texture(thread, plus_dis_path).expect("Failed to load Plus Disabled");
 
-        // NEW: Load Blue Panel
-        let panel_path = "assets/ui/UI_Flat_Frame02a.png";
-        let tex_panel_blue = rl.load_texture(thread, panel_path)
-            .expect("Failed to load Blue Panel");
+        let panel_blue_path = "assets/ui/UI_Flat_Frame02a.png";
+        let tex_panel_blue = rl.load_texture(thread, panel_blue_path).expect("Failed to load Blue Panel");
+
+        // NEW: Orange Panel
+        let panel_orange_path = "assets/ui/UI_Flat_Frame03a.png";
+        let tex_panel_orange = rl.load_texture(thread, panel_orange_path).expect("Failed to load Orange Panel");
 
         Self {
             tex_cards,
@@ -65,6 +63,7 @@ impl GameAssets {
             tex_btn_plus_active,
             tex_btn_plus_disabled,
             tex_panel_blue,
+            tex_panel_orange,
         }
     }
 }
