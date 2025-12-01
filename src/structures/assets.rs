@@ -1,37 +1,27 @@
 use raylib::prelude::*;
-use std::collections::HashMap;
 
 pub struct GameAssets {
-    pub tex_cards: HashMap<String, Texture2D>,
+    pub tex_spritesheet: Texture2D,
+    pub tex_background: Texture2D,
     pub tex_banner: Texture2D,
     pub tex_btn_play: Texture2D,
     pub tex_btn_discard: Texture2D,
     pub tex_btn_plus_active: Texture2D,
     pub tex_btn_plus_disabled: Texture2D,
     pub tex_panel_blue: Texture2D,
-    // NEW: Orange Panel
     pub tex_panel_orange: Texture2D,
 }
 
 impl GameAssets {
     pub fn load(rl: &mut RaylibHandle, thread: &RaylibThread) -> Self {
-        let mut tex_cards = HashMap::new();
-        let suits = ["clubs", "diamonds", "hearts", "spades"];
-        let ranks = ["02", "03", "04", "05", "06", "07", "08", "09", "10", "J", "Q", "K", "A"];
+        let mut tex_spritesheet = rl.load_texture(thread, "assets/resprite-cards/spritesheet.png")
+            .expect("Failed to load spritesheet at assets/resprite-cards/spritesheet.png");
 
-        for suit in suits.iter() {
-            for rank in ranks.iter() {
-                let key = format!("card_{}_{}", suit, rank);
-                let path = format!("assets/Cards/{}.png", key);
-                if let Ok(texture) = rl.load_texture(thread, &path) {
-                    tex_cards.insert(key, texture);
-                }
-            }
-        }
+        tex_spritesheet.set_texture_filter(thread, TextureFilter::TEXTURE_FILTER_BILINEAR);
 
-        if let Ok(back) = rl.load_texture(thread, "assets/Cards/card_back.png") {
-            tex_cards.insert("card_back".to_string(), back);
-        }
+        // NEW: Load Mini Text Castle
+        let tex_background = rl.load_texture(thread, "assets/bg/Mini_Text_Castle.png")
+            .expect("Failed to load background at assets/bg/Mini_Text_Castle.png");
 
         let banner_path = "assets/ui/UI_Flat_Banner04a.png";
         let tex_banner = rl.load_texture(thread, banner_path).expect("Failed to load UI banner");
@@ -51,12 +41,12 @@ impl GameAssets {
         let panel_blue_path = "assets/ui/UI_Flat_Frame02a.png";
         let tex_panel_blue = rl.load_texture(thread, panel_blue_path).expect("Failed to load Blue Panel");
 
-        // NEW: Orange Panel
         let panel_orange_path = "assets/ui/UI_Flat_Frame03a.png";
         let tex_panel_orange = rl.load_texture(thread, panel_orange_path).expect("Failed to load Orange Panel");
 
         Self {
-            tex_cards,
+            tex_spritesheet,
+            tex_background,
             tex_banner,
             tex_btn_play,
             tex_btn_discard,

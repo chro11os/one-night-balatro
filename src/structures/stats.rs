@@ -75,9 +75,9 @@ pub struct BaseModifiers {
     pub hand_size: i32,
     pub joker_slots: i32,
 
-    // New Mechanics Support
-    pub shop_price_mult: f32, // For Merchant Rune
-    pub ante_scaling: f32,    // For Evolution Rune
+    // Mechanics
+    pub shop_price_mult: f32,
+    pub ante_scaling: f32,
 
     // RPG Stats
     pub level: i32,
@@ -92,7 +92,6 @@ pub struct BaseModifiers {
     pub stat_points: i32,
     pub enemies_defeated: i32,
 
-    // Enemy Stats
     pub enemy_name: String,
     pub enemy_damage: i32,
     pub is_crit_active: bool,
@@ -102,6 +101,10 @@ pub struct BaseModifiers {
     pub floating_texts: Vec<FloatingText>,
     pub particles: Vec<Particle>,
 
+    // NEW: Screen Shake Logic
+    pub screen_shake: Vector2,
+    pub shake_timer: f32,
+
     pub score_timer: f32,
     pub score_index: usize,
     pub score_delay: f32,
@@ -110,7 +113,6 @@ pub struct BaseModifiers {
     pub previous_state: GameState,
     pub round_won: bool,
 
-    // Rune State
     pub equipped_runes: Vec<Rune>,
     pub available_runes: Vec<Rune>,
     pub max_runes: usize,
@@ -121,22 +123,22 @@ impl Default for BaseModifiers {
         // --- DEFINE RUNES ---
         let mut available_runes = Vec::new();
 
-        // RED RUNES (Power/Aggro) - IDs 1-3
+        // RED RUNES (Power/Aggro)
         available_runes.push(Rune { name: "Reaper".to_string(), description: "Steal 1 HP per enemy. Scales (+1/+2 Boss). Reduced Max HP.".to_string(), id: 1, rune_type: RuneType::Red });
         available_runes.push(Rune { name: "Judgement".to_string(), description: "Balances Chips/Mult. Double Enemy HP.".to_string(), id: 2, rune_type: RuneType::Red });
         available_runes.push(Rune { name: "Paladin".to_string(), description: "+40 Max HP. Reduced Mult/Chips.".to_string(), id: 3, rune_type: RuneType::Red });
 
-        // BLUE RUNES (Utility/Eco) - IDs 4-6
+        // BLUE RUNES (Utility/Eco)
         available_runes.push(Rune { name: "Midas".to_string(), description: "+25% Gold on Win, -25% Gold on Loss.".to_string(), id: 4, rune_type: RuneType::Blue });
         available_runes.push(Rune { name: "Greed".to_string(), description: "+1 Hand, +1 Discard. -1 Joker Slot.".to_string(), id: 5, rune_type: RuneType::Blue });
         available_runes.push(Rune { name: "Investment".to_string(), description: "Gold gain scales x2 per kill. Less gold early.".to_string(), id: 6, rune_type: RuneType::Blue });
 
-        // GREEN RUNES (Shop/Meta) - IDs 7-9
+        // GREEN RUNES (Shop/Meta)
         available_runes.push(Rune { name: "Merchant".to_string(), description: "+1 free joker per shop. Shop cost 1.2x more.".to_string(), id: 7, rune_type: RuneType::Green });
-        available_runes.push(Rune { name: "Mentalist".to_string(), description: "+1 free Enhancement Ore. Ores cost double.".to_string(), id: 8, rune_type: RuneType::Green });
+        available_runes.push(Rune { name: "Mentalist".to_string(), description: "+1 free Tarot. Tarot cards cost double.".to_string(), id: 8, rune_type: RuneType::Green });
         available_runes.push(Rune { name: "Evolution".to_string(), description: "+1 free Rare Joker per ante. Ante scales faster.".to_string(), id: 9, rune_type: RuneType::Green });
 
-        // MINOR RUNES (Stats) - IDs 100+
+        // MINOR RUNES (Stats)
         available_runes.push(Rune { name: "Force".to_string(), description: "+10 Mult.".to_string(), id: 100, rune_type: RuneType::Minor });
         available_runes.push(Rune { name: "Flow".to_string(), description: "+10 Chips.".to_string(), id: 101, rune_type: RuneType::Minor });
         available_runes.push(Rune { name: "Wealth".to_string(), description: "+3 Gold.".to_string(), id: 102, rune_type: RuneType::Minor });
@@ -158,7 +160,7 @@ impl Default for BaseModifiers {
             joker_slots: 5,
 
             shop_price_mult: 1.0,
-            ante_scaling: 1.5, // Default scaling
+            ante_scaling: 1.5,
 
             level: 1,
             current_hp: 20,
@@ -179,6 +181,10 @@ impl Default for BaseModifiers {
             floating_texts: Vec::new(),
             particles: Vec::new(),
 
+            // Screen Shake Init
+            screen_shake: Vector2::zero(),
+            shake_timer: 0.0,
+
             score_timer: 0.0,
             score_index: 0,
             score_delay: 0.0,
@@ -188,7 +194,7 @@ impl Default for BaseModifiers {
 
             equipped_runes: Vec::new(),
             available_runes,
-            max_runes: 4, // 1 Red, 1 Blue, 1 Green, 1 Minor
+            max_runes: 4,
         }
     }
 }

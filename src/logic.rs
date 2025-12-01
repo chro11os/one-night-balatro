@@ -13,6 +13,9 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
     let mouse_released = rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT);
     let tab_held = rl.is_key_down(KeyboardKey::KEY_TAB);
 
+    // DEFINE CENTER_X HERE SO IT IS VISIBLE TO ALL BLOCKS
+    let center_x = SIDEBAR_WIDTH + (SCREEN_WIDTH - SIDEBAR_WIDTH) / 2.0;
+
     // --- UPDATE FLOATING TEXTS ---
     stats.floating_texts.retain(|ft| ft.life > 0.0);
     for ft in stats.floating_texts.iter_mut() {
@@ -27,10 +30,8 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
         p.life -= dt;
         p.pos += p.vel * dt;
         p.rotation += p.rot_speed * dt;
-
-        // Physics
-        p.vel.y += 500.0 * dt; // Gravity
-        p.vel.x *= 0.95;       // Drag
+        p.vel.y += 500.0 * dt;
+        p.vel.x *= 0.95;
     }
 
     // --- DEV TOOLBOX ---
@@ -88,6 +89,7 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
                 card.is_pressed = true;
                 card.is_dragging = false;
                 card.click_pos = mouse_pos;
+                card.scale = SELECTED_SCALE * 0.9;
             }
         }
 
@@ -103,8 +105,8 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
                 }
                 if card.is_dragging {
                     card.target_pos.x = mouse_pos.x;
-                    if card.is_selected { card.target_pos.y = HAND_Y_POS - 60.0; }
-                    else { card.target_pos.y = HAND_Y_POS; }
+                    if card.is_selected { card.target_pos.y = HAND_Y_POS - 70.0; }
+                    else { card.target_pos.y = HAND_Y_POS - 10.0; }
 
                     if idx > 0 && hand[idx].target_pos.x < hand[idx - 1].target_pos.x { hand.swap(idx, idx - 1); }
                     if idx < hand.len() - 1 && hand[idx].target_pos.x > hand[idx + 1].target_pos.x { hand.swap(idx, idx + 1); }
@@ -162,7 +164,6 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
             stats.chips = base_chips + level_bonus + card_chips;
             stats.mult = base_mult + (stats.level - 1);
 
-            // Apply Minor Rune Stats
             if stats.equipped_runes.iter().any(|r| r.name == "Flow") { stats.chips += 10; }
             if stats.equipped_runes.iter().any(|r| r.name == "Force") { stats.mult += 10; }
         } else {
@@ -173,7 +174,6 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
     }
 
     // --- BUTTONS ---
-    let center_x = SIDEBAR_WIDTH + (SCREEN_WIDTH - SIDEBAR_WIDTH)/2.0;
     let btn_y = 660.0;
     let sort_y = 620.0;
 
@@ -183,7 +183,7 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
     let sort_rank_btn = Rectangle::new(center_x - SORT_BTN_WIDTH - 5.0, sort_y, SORT_BTN_WIDTH, SORT_BTN_HEIGHT);
     let sort_suit_btn = Rectangle::new(center_x + 5.0, sort_y, SORT_BTN_WIDTH, SORT_BTN_HEIGHT);
 
-    // NEW: Run Info Button (Matches Sidebar Position)
+    // Sidebar Stats Button
     let stats_y = 500.0;
     let money_y = stats_y + 80.0;
     let info_btn_y = money_y + 70.0;
@@ -225,7 +225,7 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
             hand.sort_by(|a, b| a.suit.cmp(&b.suit).then(b.value.cmp(&a.value)));
         }
 
-        // NEW: Check Info Button
+        // Stats Button
         if info_btn_rect.check_collision_point_rec(mouse_pos) {
             stats.previous_state = *state;
             *state = GameState::StatsMenu;
@@ -248,7 +248,6 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
                 let target_x = start_x + (idx as f32 * played_spacing);
                 card.target_pos = Vector2::new(target_x, PLAYED_Y_POS);
 
-                // JUNK CARD LOGIC
                 if scoring_ids.contains(&card.id) { card.target_scale = PLAYED_SCALE; }
                 else { card.target_scale = JUNK_SCALE; }
 
@@ -269,7 +268,6 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
                 stats.chips = base_chips + level_bonus;
                 stats.mult = base_mult + (stats.level - 1);
 
-                // Apply Minor Rune Stats
                 if stats.equipped_runes.iter().any(|r| r.name == "Flow") { stats.chips += 10; }
                 if stats.equipped_runes.iter().any(|r| r.name == "Force") { stats.mult += 10; }
             }
@@ -281,7 +279,7 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
         }
     }
 
-    // --- PHASE 2: SCORING SEQUENCE (PULSE) ---
+    // --- PHASE 2: SCORING SEQUENCE ---
     if *animation_state == AnimationState::ScoringSeq {
         stats.score_timer -= dt;
 
@@ -317,12 +315,11 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
                             max_life: 1.0,
                         });
 
-                        // Spawn Black Smoke Particles
+                        // Smoke
                         for _ in 0..10 {
                             let vx = unsafe { raylib::ffi::GetRandomValue(-50, 50) } as f32;
                             let vy = unsafe { raylib::ffi::GetRandomValue(-50, -150) } as f32;
                             let size = unsafe { raylib::ffi::GetRandomValue(5, 12) } as f32;
-
                             stats.particles.push(Particle {
                                 pos: card.current_pos,
                                 vel: Vector2::new(vx, vy),
@@ -334,52 +331,46 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
                                 rot_speed: vx * 0.1,
                             });
                         }
-
                         card.scale = PLAYED_SCALE * 0.9;
                     } else {
                         let val = poker::get_card_chip_value(card);
                         stats.chips += val;
 
-                        // POP ANIMATION
-                        let pop_size = if stats.is_crit_active { PLAYED_SCALE * 1.8 } else { PLAYED_SCALE * 1.5 };
-                        card.scale = pop_size;
+                        // IMPACT
+                        card.scale = 2.0;
 
-                        let (txt_size, txt_col) = if stats.is_crit_active { (50, NEU_YELLOW) } else { (40, NEU_BLUE) };
+                        let (txt_size, txt_col) = if stats.is_crit_active { (60, NEU_YELLOW) } else { (45, NEU_BLUE) };
+                        let vx = unsafe { raylib::ffi::GetRandomValue(-50, 50) } as f32;
+
                         stats.floating_texts.push(FloatingText {
                             pos: Vector2::new(card.current_pos.x - 20.0, card.current_pos.y - 100.0),
-                            vel: Vector2::new(0.0, -150.0),
+                            vel: Vector2::new(vx, -250.0),
                             text: format!("+{}", val),
                             color: txt_col,
                             size: txt_size,
-                            life: 0.8,
-                            max_life: 0.8,
+                            life: 0.6,
+                            max_life: 0.6,
                         });
 
-                        // SPAWN PARTICLES
-                        let p_color = if stats.is_crit_active { NEU_YELLOW } else { NEU_BLUE };
-                        let p_count = if stats.is_crit_active { 25 } else { 15 };
-
+                        let p_count = if stats.is_crit_active { 40 } else { 20 };
                         for _ in 0..p_count {
-                            let vx = unsafe { raylib::ffi::GetRandomValue(-200, 200) } as f32;
-                            let vy = unsafe { raylib::ffi::GetRandomValue(-300, 100) } as f32;
-                            let size = unsafe { raylib::ffi::GetRandomValue(4, 10) } as f32;
-                            let life = unsafe { raylib::ffi::GetRandomValue(5, 12) } as f32 / 10.0;
-
+                            let vx = unsafe { raylib::ffi::GetRandomValue(-300, 300) } as f32;
+                            let vy = unsafe { raylib::ffi::GetRandomValue(-400, 100) } as f32;
+                            let size = unsafe { raylib::ffi::GetRandomValue(6, 14) } as f32;
+                            let life = unsafe { raylib::ffi::GetRandomValue(5, 10) } as f32 / 10.0;
                             stats.particles.push(Particle {
                                 pos: card.current_pos,
                                 vel: Vector2::new(vx, vy),
-                                color: p_color,
+                                color: if stats.is_crit_active { NEU_YELLOW } else { NEU_BLUE },
                                 size,
                                 life,
                                 max_life: life,
                                 rotation: 0.0,
-                                rot_speed: vx * 0.05,
+                                rot_speed: vx * 0.1,
                             });
                         }
                     }
-                    let speed_factor = if stats.is_crit_active { 0.4 } else { 0.6 };
-                    stats.score_delay *= speed_factor;
-                    stats.score_timer = stats.score_delay.max(0.05);
+                    stats.score_timer = if stats.is_crit_active { 0.15 } else { 0.25 };
                 } else {
                     stats.score_timer = 0.05;
                 }
@@ -388,14 +379,15 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
                 let raw_score = stats.chips * stats.mult;
                 if stats.is_crit_active {
                     stats.total_score += (raw_score as f32 * stats.crit_mult) as i32;
+                    stats.shake_timer = 0.5;
                     stats.floating_texts.push(FloatingText {
-                        pos: Vector2::new(center_x - 120.0, PLAYED_Y_POS - 180.0),
-                        vel: Vector2::new(0.0, -50.0),
+                        pos: Vector2::new(center_x - 150.0, PLAYED_Y_POS - 200.0),
+                        vel: Vector2::new(0.0, -20.0),
                         text: "CRITICAL!".to_string(),
                         color: NEU_YELLOW,
-                        size: 70,
-                        life: 2.0,
-                        max_life: 2.0,
+                        size: 80,
+                        life: 1.5,
+                        max_life: 1.5,
                     });
                 } else {
                     stats.total_score += raw_score;
@@ -455,7 +447,6 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
 
     stats.deck_count = deck.len() as i32;
 }
-
 pub fn update_battle_result(rl: &RaylibHandle, state: &mut GameState, stats: &mut BaseModifiers) {
     let mouse_pos = rl.get_mouse_position();
     let clicked = rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT);

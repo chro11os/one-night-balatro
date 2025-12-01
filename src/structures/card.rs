@@ -50,8 +50,9 @@ impl Card {
     }
 
     pub fn update_anim(&mut self, dt: f32, total_time: f32) {
-        let stiffness = 1800.0;
-        let damping = 90.0;
+        // TWEAKED: Higher stiffness = Snappier. Higher damping = Less wobble.
+        let stiffness = 2200.0;
+        let damping = 110.0;
         let mass = 1.0;
 
         let force = (self.target_pos - self.current_pos) * stiffness;
@@ -60,24 +61,29 @@ impl Card {
         self.velocity += acceleration * dt;
         self.current_pos += self.velocity * dt;
 
-        let rot_force = (self.target_rotation - self.rotation) * stiffness;
-        let rot_damping = self.rot_velocity * damping;
+        // SCALE: Linear interpolation for snappy grow/shrink
+        // 40.0 speed makes it pop instantly
+        let scale_diff = self.target_scale - self.scale;
+        self.scale += scale_diff * 40.0 * dt;
+
+        // ROTATION LOGIC
+        if self.is_dragging {
+            // DYNAMIC TILT: Rotate based on how fast we are dragging horizontally
+            // This creates the "Sticky/Air Resistance" feel
+            let tilt_target = (self.velocity.x * 0.0015).clamp(-0.4, 0.4);
+            self.target_rotation = tilt_target;
+        } else if self.is_hovered && !self.is_selected && !self.is_pressed {
+            self.target_scale = 1.25; // Bigger hover pop
+            self.target_rotation = (total_time * 6.0).sin() * 0.05; // Gentle idle sway
+        } else {
+            self.target_rotation = 0.0;
+        }
+
+        // Apply rotation physics
+        let rot_force = (self.target_rotation - self.rotation) * 1200.0; // Stiff rotation
+        let rot_damping = self.rot_velocity * 60.0;
         let rot_accel = (rot_force - rot_damping) / mass;
         self.rot_velocity += rot_accel * dt;
         self.rotation += self.rot_velocity * dt;
-
-        self.tilt = self.velocity.x * 0.03;
-
-        // Scale Physics (Linear Interp for snappiness)
-        let scale_diff = self.target_scale - self.scale;
-        self.scale += scale_diff * 30.0 * dt;
-
-        if self.is_hovered && !self.is_selected && !self.is_dragging && !self.is_pressed {
-            self.target_scale = 1.15;
-            self.target_rotation = (total_time * 8.0).sin() * 0.03;
-        }
-
-        // Removed: is_shaking (Vibration) logic
-        // The pulse is now handled by manually setting self.scale > self.target_scale
     }
 }
