@@ -4,6 +4,7 @@ mod logic;
 mod consts;
 mod structures;
 mod poker;
+mod bench; // Import the new module
 
 use raylib::prelude::*;
 use structures::card::Card;
@@ -11,6 +12,7 @@ use structures::stats::BaseModifiers;
 use structures::assets::GameAssets;
 use structures::state::{GameState, AnimationState};
 use consts::*;
+use std::time::Instant; // Import Instant
 
 fn main() {
     let (mut rl, thread) = window_init::initialize_window();
@@ -19,6 +21,9 @@ fn main() {
 
     let mut current_state = GameState::Menu;
     let mut animation_state = AnimationState::Idle;
+
+    // Initialize Benchmarker
+    let mut bench = bench::GameBench::new();
 
     // FIX: Pass 'hand_size' as an argument so we don't capture 'stats'
     let setup_game = |hand_size: i32| -> (Vec<Card>, Vec<Card>) {
@@ -52,9 +57,13 @@ fn main() {
     stats.deck_count = deck.len() as i32;
 
     while !rl.window_should_close() && current_state != GameState::Exit {
+        let frame_start = bench.start_frame(); // Start measuring frame time
+
         let dt = rl.get_frame_time();
         let total_time = rl.get_time() as f32;
 
+        // Measure Update Time
+        let update_start = Instant::now();
         match current_state {
             GameState::Menu => {
                 logic::update_menu(&rl, &mut current_state);
@@ -93,8 +102,25 @@ fn main() {
             }
             _ => {}
         }
+        bench.record_update(update_start.elapsed());
 
+        // Measure Draw Time
+        let draw_start = Instant::now();
         let mut d = rl.begin_drawing(&thread);
         draw_scene::draw_scene(&mut d, &stats, &hand[..], &current_state, &assets, &animation_state);
+
+        // Optional: Draw Benchmark Info on Screen
+        // d.draw_text(&format!("FPS: {:.0}", bench.updates_per_second), 10, 10, 20, Color::GREEN);
+
+        // End Draw Measurement (approximate, since swap_buffers happens after drop)
+        bench.record_draw(draw_start.elapsed());
+        drop(d); // Force drawing to finish (mostly)
+
+        bench.end_frame(frame_start); // Finish frame measurement
+
+        // Print Report every second
+        if let Some(report) = bench.report() {
+            println!("{}", report);
+        }
     }
 }
