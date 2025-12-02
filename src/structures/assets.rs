@@ -19,9 +19,13 @@ impl GameAssets {
 
         tex_spritesheet.set_texture_filter(thread, TextureFilter::TEXTURE_FILTER_BILINEAR);
 
-        // NEW: Load Mini Text Castle
-        let tex_background = rl.load_texture(thread, "assets/bg/Mini_Text_Castle.png")
-            .expect("Failed to load background at assets/bg/Mini_Text_Castle.png");
+        // FIX: Try to load the new background; fall back to the old one if missing to prevent crash.
+        let tex_background = rl.load_texture(thread, "assets/bg/Final_bg.png")
+            .or_else(|_| {
+                println!("WARNING: Could not find 'assets/Final_bg.png'. Reverting to default background.");
+                rl.load_texture(thread, "assets/bg/Mini_Text_Castle.png")
+            })
+            .expect("Failed to load background (checked both Final_bg.png and Mini_Text_Castle.png)");
 
         let banner_path = "assets/ui/UI_Flat_Banner04a.png";
         let tex_banner = rl.load_texture(thread, banner_path).expect("Failed to load UI banner");

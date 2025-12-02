@@ -17,7 +17,6 @@ pub enum BossAbility {
     PayToDiscard,
 }
 
-// NEW: Categorize Runes
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RuneType {
     Red,   // Aggro/Power
@@ -32,6 +31,15 @@ pub struct Rune {
     pub description: String,
     pub id: i32,
     pub rune_type: RuneType,
+}
+
+// NEW: Relic (Joker) Struct
+#[derive(Debug, Clone, PartialEq)]
+pub struct Relic {
+    pub id: String,        // String ID for logic checks (e.g., "relic_feather")
+    pub name: String,
+    pub description: String,
+    pub value: i32,        // Mutable value for counters (stacks, current mult, etc.)
 }
 
 #[derive(Debug)]
@@ -101,7 +109,7 @@ pub struct BaseModifiers {
     pub floating_texts: Vec<FloatingText>,
     pub particles: Vec<Particle>,
 
-    // NEW: Screen Shake Logic
+    // Screen Shake Logic
     pub screen_shake: Vector2,
     pub shake_timer: f32,
 
@@ -113,9 +121,14 @@ pub struct BaseModifiers {
     pub previous_state: GameState,
     pub round_won: bool,
 
+    // Runes (Class/Meta)
     pub equipped_runes: Vec<Rune>,
     pub available_runes: Vec<Rune>,
     pub max_runes: usize,
+
+    // NEW: Relics (Jokers)
+    pub equipped_relics: Vec<Relic>,
+    pub relic_pool: Vec<Relic>,
 }
 
 impl Default for BaseModifiers {
@@ -142,6 +155,91 @@ impl Default for BaseModifiers {
         available_runes.push(Rune { name: "Force".to_string(), description: "+10 Mult.".to_string(), id: 100, rune_type: RuneType::Minor });
         available_runes.push(Rune { name: "Flow".to_string(), description: "+10 Chips.".to_string(), id: 101, rune_type: RuneType::Minor });
         available_runes.push(Rune { name: "Wealth".to_string(), description: "+3 Gold.".to_string(), id: 102, rune_type: RuneType::Minor });
+
+        // --- DEFINE RELICS (Jokers) ---
+        let mut relic_pool = Vec::new();
+
+        // 1. Phoenix Feather (Resurrect)
+        relic_pool.push(Relic {
+            id: "relic_feather".to_string(),
+            name: "Phoenix Feather".to_string(),
+            description: "On Death: Resurrect with 20% HP. Destroyed on use.".to_string(),
+            value: 0,
+        });
+
+        // 2. Echo Crystal (Retrigger)
+        relic_pool.push(Relic {
+            id: "relic_echo".to_string(),
+            name: "Echo Crystal".to_string(),
+            description: "Retrigger all playing cards 1 time.".to_string(),
+            value: 0,
+        });
+
+        // 3. Twin Daggers (Scaling Mult on Pair/TwoPair)
+        relic_pool.push(Relic {
+            id: "relic_daggers".to_string(),
+            name: "Twin Daggers".to_string(),
+            description: "Gain +1 Mult for every Pair or Two Pair played.".to_string(),
+            value: 0,
+        });
+
+        // 4. Fading Torch (Decaying Mult)
+        relic_pool.push(Relic {
+            id: "relic_torch".to_string(),
+            name: "Fading Torch".to_string(),
+            description: "+20 Mult. Decreases by 3 Mult at end of round.".to_string(),
+            value: 20,
+        });
+
+        // 5. Bag of Holding (Hand/Discard)
+        relic_pool.push(Relic {
+            id: "relic_bag".to_string(),
+            name: "Bag of Holding".to_string(),
+            description: "+1 Hand Size, +1 Discard.".to_string(),
+            value: 0,
+        });
+
+        // --- NEW BALANCED RELICS ---
+
+        // 6. Vampire's Fang (Sustain)
+        relic_pool.push(Relic {
+            id: "relic_fang".to_string(),
+            name: "Vampire's Fang".to_string(),
+            description: "Heal 1 HP for every Face Card (J, Q, K) played.".to_string(),
+            value: 0,
+        });
+
+        // 7. Stone Gauntlet (Power Trade-off)
+        relic_pool.push(Relic {
+            id: "relic_gauntlet".to_string(),
+            name: "Stone Gauntlet".to_string(),
+            description: "+50 Chips. -1 Hand Size.".to_string(),
+            value: 50,
+        });
+
+        // 8. Merchant's Rug (Economy)
+        relic_pool.push(Relic {
+            id: "relic_rug".to_string(),
+            name: "Merchant's Rug".to_string(),
+            description: "Shop items cost 20% less.".to_string(),
+            value: 20, // Percent discount
+        });
+
+        // 9. Lucky Clover (Stats)
+        relic_pool.push(Relic {
+            id: "relic_clover".to_string(),
+            name: "Lucky Clover".to_string(),
+            description: "+10% Critical Hit Chance.".to_string(),
+            value: 10,
+        });
+
+        // 10. Berserker's Helm (Conditional Power)
+        relic_pool.push(Relic {
+            id: "relic_helm".to_string(),
+            name: "Berserker's Helm".to_string(),
+            description: "+15 Mult if current HP is below 50%.".to_string(),
+            value: 15,
+        });
 
         Self {
             mult: 0,
@@ -181,7 +279,6 @@ impl Default for BaseModifiers {
             floating_texts: Vec::new(),
             particles: Vec::new(),
 
-            // Screen Shake Init
             screen_shake: Vector2::zero(),
             shake_timer: 0.0,
 
@@ -195,6 +292,9 @@ impl Default for BaseModifiers {
             equipped_runes: Vec::new(),
             available_runes,
             max_runes: 4,
+
+            equipped_relics: Vec::new(),
+            relic_pool,
         }
     }
 }
