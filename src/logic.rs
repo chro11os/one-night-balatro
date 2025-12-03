@@ -15,21 +15,169 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
 
     let center_x = (SIDEBAR_WIDTH + (SCREEN_WIDTH - SIDEBAR_WIDTH) / 2.0) + CENTER_OFFSET_X;
 
-    // ... (Floating Text, Particles, Dev Toolbox, Interaction logic omitted - keep as is) ...
-    // Note: Pasting just the button logic update for brevity, assuming standard logic.rs structure
+    // --- UPDATE FLOATING TEXTS ---
+    stats.floating_texts.retain(|ft| ft.life > 0.0);
+    for ft in stats.floating_texts.iter_mut() {
+        ft.pos += ft.vel * dt;
+        ft.life -= dt;
+        ft.vel.y -= 100.0 * dt;
+    }
+
+    // --- UPDATE PARTICLES ---
+    stats.particles.retain(|p| p.life > 0.0);
+    for p in stats.particles.iter_mut() {
+        p.life -= dt;
+        p.pos += p.vel * dt;
+        p.rotation += p.rot_speed * dt;
+        p.vel.y += 500.0 * dt;
+        p.vel.x *= 0.95;
+    }
+
+    // --- DEV TOOLBOX ---
+    if tab_held && mouse_pressed {
+        let start_x = DEV_BOX_X + 10.0;
+        let mut start_y = DEV_BOX_Y + 40.0;
+        let mut check_dev_btn = |_label: &str| -> bool {
+            let rect = Rectangle::new(start_x, start_y, DEV_BTN_W, DEV_BTN_H);
+            start_y += DEV_BTN_H + DEV_GAP;
+            rect.check_collision_point_rec(mouse_pos)
+        };
+        if check_dev_btn("+ Discard") { stats.discards_remaining += 1; }
+        if check_dev_btn("+ Hand") { stats.hands_remaining += 1; }
+        if check_dev_btn("+ XP (Test)") {
+            stats.xp += 50;
+            if stats.xp >= stats.xp_target {
+                stats.xp -= stats.xp_target;
+                stats.level += 1;
+                stats.xp_target += 50;
+                stats.stat_points += 3;
+            }
+        }
+        if check_dev_btn("+ Money") { stats.money += 10; }
+        if check_dev_btn("Insta-Win") { stats.total_score += 10000; }
+    }
+
+    // --- INTERACTION ---
+    if !tab_held && *animation_state == AnimationState::Idle {
+        let mut hovered_index = None;
+        let mut interaction_index = None;
+
+        if let Some(idx) = hand.iter().position(|c| c.is_pressed || c.is_dragging) {
+            interaction_index = Some(idx);
+            hovered_index = Some(idx);
+        } else {
+            for (i, card) in hand.iter_mut().enumerate().rev() {
+                let width = CARD_WIDTH * card.target_scale;
+                let height = CARD_HEIGHT * card.target_scale;
+                let hit_x = card.current_pos.x;
+                let hit_y = card.current_pos.y;
+                let rect = Rectangle::new(hit_x - width / 2.0, hit_y - height / 2.0, width, height);
+
+                if rect.check_collision_point_rec(mouse_pos) {
+                    hovered_index = Some(i);
+                    break;
+                }
+            }
+        }
+
+        if mouse_pressed {
+            if let Some(idx) = hovered_index {
+                let card = &mut hand[idx];
+                card.is_pressed = true;
+                card.is_dragging = false;
+                card.click_pos = mouse_pos;
+                card.scale = SELECTED_SCALE * 0.9;
+            }
+        }
+
+        if mouse_down {
+            if let Some(idx) = interaction_index {
+                let card = &mut hand[idx];
+                if card.is_pressed && !card.is_dragging {
+                    let distance = ((mouse_pos.x - card.click_pos.x).powi(2) + (mouse_pos.y - card.click_pos.y).powi(2)).sqrt();
+                    if distance > 5.0 {
+                        card.is_dragging = true;
+                        card.scale = SELECTED_SCALE * 1.1;
+                    }
+                }
+                if card.is_dragging {
+                    card.target_pos.x = mouse_pos.x;
+                    card.target_pos.y = mouse_pos.y;
+                    card.target_rotation = 0.0;
+                    if idx > 0 && hand[idx].target_pos.x < hand[idx - 1].target_pos.x { hand.swap(idx, idx - 1); }
+                    if idx < hand.len() - 1 && hand[idx].target_pos.x > hand[idx + 1].target_pos.x { hand.swap(idx, idx + 1); }
+                }
+            }
+        }
+
+        if mouse_released {
+            if let Some(idx) = interaction_index {
+                let selected_count = hand.iter().filter(|c| c.is_selected).count();
+                let card = &mut hand[idx];
+                if card.is_dragging {
+                    card.is_dragging = false;
+                    card.is_pressed = false;
+                } else if card.is_pressed {
+                    card.is_pressed = false;
+                    if card.is_selected { card.is_selected = false; }
+                    else if selected_count < 5 { card.is_selected = true; }
+                }
+            }
+        }
+
+        for (i, card) in hand.iter_mut().enumerate() {
+            let is_hovered = Some(i) == hovered_index;
+            if card.is_hovered != is_hovered { card.is_hovered = is_hovered; }
+        }
+    }
+
+    // --- PHYSICS UPDATE ---
+    calculate_hand_positions(hand, animation_state);
+    for card in hand.iter_mut() {
+        card.update_anim(dt, total_time);
+    }
+
+    // --- SCORING PREVIEW ---
+    if *animation_state == AnimationState::Idle {
+        let selected_cards: Vec<Card> = hand.iter().filter(|c| c.is_selected).cloned().collect();
+        if !selected_cards.is_empty() {
+            let rank = poker::get_hand_rank(&selected_cards);
+            stats.hand_rank = Some(rank);
+
+            let scoring_ids = poker::get_scoring_ids(&selected_cards);
+            let (base_chips, base_mult) = poker::get_hand_base_score(rank);
+            let level_bonus = (stats.level - 1) * 5;
+
+            let mut card_chips = 0;
+            for card in &selected_cards {
+                if scoring_ids.contains(&card.id) {
+                    let mut is_debuffed = false;
+                    if let BossAbility::SilenceSuit(s) = stats.active_ability {
+                        if card.suit == s { is_debuffed = true; }
+                    }
+                    if !is_debuffed {
+                        card_chips += poker::get_card_chip_value(card);
+                    }
+                }
+            }
+            stats.chips = base_chips + level_bonus + card_chips;
+            stats.mult = base_mult + (stats.level - 1);
+
+            if stats.equipped_runes.iter().any(|r| r.name == "Flow") { stats.chips += 10; }
+            if stats.equipped_runes.iter().any(|r| r.name == "Force") { stats.mult += 10; }
+        } else {
+            stats.hand_rank = None;
+            stats.chips = 0;
+            stats.mult = 0;
+        }
+    }
 
     // --- BUTTONS ---
-    // Action Buttons (Play/Discard)
     let play_btn = Rectangle::new(center_x - BTN_WIDTH - 10.0, ACTION_BTN_Y, BTN_WIDTH, BTN_HEIGHT);
     let discard_btn = Rectangle::new(center_x + 10.0, ACTION_BTN_Y, BTN_WIDTH, BTN_HEIGHT);
-
-    // Sort Buttons (Below Deck)
     let sort_rank_btn = Rectangle::new(SORT_RANK_POS.x, SORT_RANK_POS.y, SORT_BTN_WIDTH, SORT_BTN_HEIGHT);
     let sort_suit_btn = Rectangle::new(SORT_SUIT_POS.x, SORT_SUIT_POS.y, SORT_BTN_WIDTH, SORT_BTN_HEIGHT);
-
     let info_btn_rect = Rectangle::new(90.0, 650.0, 120.0, 40.0);
-
-    // ... (Hover Logic etc) ...
 
     if !tab_held && *animation_state == AnimationState::Idle && mouse_pressed {
         let selected_cards_count = hand.iter().filter(|c| c.is_selected).count();
@@ -76,7 +224,6 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
     if *animation_state == AnimationState::Playing {
         let mut all_arrived = true;
         let played_count = hand.iter().filter(|c| c.is_selected).count();
-        // Smaller spacing for the "Depth" look
         let played_spacing = 110.0;
         let start_x = center_x - ((played_count as f32 - 1.0) * played_spacing) / 2.0;
 
@@ -89,12 +236,8 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
                 let target_x = start_x + (idx as f32 * played_spacing);
                 card.target_pos = Vector2::new(target_x, PLAYED_Y_POS);
 
-                if scoring_ids.contains(&card.id) {
-                    card.target_scale = PLAYED_SCALE; // Use the smaller depth scale
-                }
-                else {
-                    card.target_scale = JUNK_SCALE * 0.8;
-                }
+                if scoring_ids.contains(&card.id) { card.target_scale = PLAYED_SCALE; }
+                else { card.target_scale = JUNK_SCALE * 0.8; }
 
                 card.target_rotation = 0.0;
                 if (card.current_pos.y - PLAYED_Y_POS).abs() > 2.0 { all_arrived = false; }
@@ -163,12 +306,7 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
                     } else {
                         let val = poker::get_card_chip_value(card);
                         stats.chips += val;
-
-                        // [ARTIFACT HOOK] - OnCardScore
-                        // e.g. if card.suit == Suit::Hearts && stats.has_artifact("Bloodstone") { ... }
-
-                        // IMPACT VISUALS
-                        card.scale = 2.0;
+                        card.scale = 1.3; // Small pop
 
                         let (txt_size, txt_col) = if stats.is_crit_active { (60, NEU_YELLOW) } else { (45, NEU_BLUE) };
                         let vx = unsafe { raylib::ffi::GetRandomValue(-50, 50) } as f32;
@@ -183,7 +321,6 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
                             max_life: 0.6,
                         });
 
-                        // Particle Effects...
                         let p_count = if stats.is_crit_active { 40 } else { 20 };
                         for _ in 0..p_count {
                             let vx = unsafe { raylib::ffi::GetRandomValue(-300, 300) } as f32;
@@ -208,8 +345,6 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
                 }
                 stats.score_index += 1;
             } else {
-                // [ARTIFACT HOOK] - OnHandEnd (Held in Hand effects?)
-
                 let raw_score = stats.chips * stats.mult;
                 if stats.is_crit_active {
                     stats.total_score += (raw_score as f32 * stats.crit_mult) as i32;
@@ -281,6 +416,7 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
 
     stats.deck_count = deck.len() as i32;
 }
+
 pub fn update_battle_result(rl: &RaylibHandle, state: &mut GameState, stats: &mut BaseModifiers) {
     let mouse_pos = rl.get_mouse_position();
     let clicked = rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT);
@@ -384,40 +520,6 @@ pub fn update_rune_select(rl: &RaylibHandle, state: &mut GameState, stats: &mut 
                 }
             }
             *state = GameState::Playing;
-        }
-    }
-}
-
-fn calculate_hand_positions(hand: &mut Vec<Card>, anim_state: &AnimationState) {
-    let count = hand.len();
-    if count == 0 { return; }
-    let center_x = (SIDEBAR_WIDTH + (SCREEN_WIDTH - SIDEBAR_WIDTH) / 2.0) + CENTER_OFFSET_X;
-    let hand_y = HAND_Y_POS;
-    let card_spacing = 100.0;
-    let hand_start_x = center_x - ((count as f32 - 1.0) * card_spacing) / 2.0;
-
-    for (i, card) in hand.iter_mut().enumerate() {
-        if card.is_dragging {
-            if card.is_selected {
-                card.target_pos.y = hand_y - 60.0;
-                card.target_scale = SELECTED_SCALE * 1.1;
-            } else {
-                card.target_pos.y = hand_y;
-                card.target_scale = HAND_SCALE * 1.1;
-            }
-            continue;
-        }
-        if *anim_state != AnimationState::Idle && card.is_selected { continue; }
-
-        card.target_pos.x = hand_start_x + (i as f32 * card_spacing);
-        if card.is_selected {
-            card.target_pos.y = hand_y - 60.0;
-            card.target_scale = SELECTED_SCALE;
-            card.target_rotation = 0.0;
-        } else {
-            card.target_pos.y = hand_y;
-            card.target_scale = HAND_SCALE;
-            card.target_rotation = 0.0;
         }
     }
 }
@@ -610,5 +712,43 @@ fn get_new_enemy(ante: i32) -> (String, BossAbility) {
         let b_idx = unsafe { raylib::ffi::GetRandomValue(0, 3) } as usize;
         let (name, ability) = bosses[b_idx].clone();
         (name.to_string(), ability)
+    }
+}
+
+// --- HELPER FUNCTIONS ---
+fn calculate_hand_positions(hand: &mut Vec<Card>, anim_state: &AnimationState) {
+    let count = hand.len();
+    if count == 0 { return; }
+
+    // UPDATE: Use the center offset from consts
+    let center_x = (SIDEBAR_WIDTH + (SCREEN_WIDTH - SIDEBAR_WIDTH) / 2.0) + CENTER_OFFSET_X;
+
+    let hand_y = HAND_Y_POS;
+    let card_spacing = 100.0;
+    let hand_start_x = center_x - ((count as f32 - 1.0) * card_spacing) / 2.0;
+
+    for (i, card) in hand.iter_mut().enumerate() {
+        if card.is_dragging {
+            if card.is_selected {
+                card.target_pos.y = hand_y - 60.0;
+                card.target_scale = SELECTED_SCALE * 1.1;
+            } else {
+                card.target_pos.y = hand_y;
+                card.target_scale = HAND_SCALE * 1.1;
+            }
+            continue;
+        }
+        if *anim_state != AnimationState::Idle && card.is_selected { continue; }
+
+        card.target_pos.x = hand_start_x + (i as f32 * card_spacing);
+        if card.is_selected {
+            card.target_pos.y = hand_y - 60.0;
+            card.target_scale = SELECTED_SCALE;
+            card.target_rotation = 0.0;
+        } else {
+            card.target_pos.y = hand_y;
+            card.target_scale = HAND_SCALE;
+            card.target_rotation = 0.0;
+        }
     }
 }

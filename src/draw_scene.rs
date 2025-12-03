@@ -644,8 +644,15 @@ fn draw_dev_toolbox(d: &mut RaylibDrawHandle) {
 fn draw_game_area(d: &mut RaylibDrawHandle, hand: &[Card], assets: &GameAssets, _stats: &BaseModifiers) {
     let center_x = (SIDEBAR_WIDTH + (SCREEN_WIDTH - SIDEBAR_WIDTH) / 2.0) + CENTER_OFFSET_X;
 
-    // Draw Cards (Behind UI)
-    for card in hand { draw_single_card(d, card, assets); }
+    // DEBUG: Check if hand is empty
+    if hand.is_empty() {
+        d.draw_text("DEBUG: HAND IS EMPTY", 500, 300, 40, Color::RED);
+    }
+
+    // DRAW CARDS (First, so they are behind UI)
+    for card in hand {
+        draw_single_card(d, card, assets);
+    }
 
     // --- SORT BUTTONS (Below Deck) ---
     // Rank Button
@@ -700,7 +707,6 @@ fn draw_game_area(d: &mut RaylibDrawHandle, hand: &[Card], assets: &GameAssets, 
 fn draw_single_card(d: &mut RaylibDrawHandle, card: &Card, assets: &GameAssets) {
     const SHEET_W: f32 = 5928.0;
     const SHEET_H: f32 = 2848.0;
-
     const COLS: f32 = 13.0;
     const ROWS: f32 = 4.0;
 
@@ -712,8 +718,8 @@ fn draw_single_card(d: &mut RaylibDrawHandle, card: &Card, assets: &GameAssets) 
     let row_idx = match card.suit {
         0 => 0, // Clubs
         1 => 1, // Diamonds
-        2 => 3, // Hearts is Row 3 in your image
-        3 => 2, // Spades is Row 2 in your image
+        2 => 3, // Hearts
+        3 => 2, // Spades
         _ => 0,
     };
 
@@ -736,6 +742,7 @@ fn draw_single_card(d: &mut RaylibDrawHandle, card: &Card, assets: &GameAssets) 
 
     let origin = Vector2::new(dest_width / 2.0, dest_height / 2.0);
 
+    // 1. Draw Shadow
     let shadow_dist = (card.scale * 10.0).max(5.0);
     let shadow_rect = Rectangle::new(
         dest_rect.x + shadow_dist,
@@ -753,6 +760,16 @@ fn draw_single_card(d: &mut RaylibDrawHandle, card: &Card, assets: &GameAssets) 
         Color::BLACK.alpha(0.5)
     );
 
+    // 2. Fallback Body (Draws behind texture - keeps card visible if texture fails)
+    // We use a rotated rectangle logic manually or just a simple rect if rotation is small
+    // For simplicity, using texture pro with a solid white pixel if available would be best,
+    // but here we just rely on the texture. If texture is missing, this won't help unless we draw a rect.
+    // Let's draw a backup rectangle.
+    let backup_rec = Rectangle::new(card.current_pos.x, card.current_pos.y, dest_width, dest_height);
+    d.draw_rectangle_pro(backup_rec, origin, card.rotation * 57.29, PARCHMENT);
+
+
+    // 3. Draw Card Texture
     let tint = if card.is_hovered { Color::WHITE } else { Color::new(245, 245, 245, 255) };
 
     d.draw_texture_pro(
