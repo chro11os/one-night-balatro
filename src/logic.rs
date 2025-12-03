@@ -1,6 +1,6 @@
 use crate::poker;
 use raylib::prelude::*;
-use crate::structures::stats::{BaseModifiers, FloatingText, Particle, SortMode, BossAbility, RuneType};
+use crate::structures::stats::{BaseModifiers, FloatingText, Particle, SortMode, BossAbility, RuneType}; // Removed Relic
 use crate::structures::card::Card;
 use crate::structures::state::{GameState, AnimationState};
 use crate::consts::*;
@@ -542,7 +542,6 @@ pub fn update_shop(rl: &RaylibHandle, state: &mut GameState, stats: &mut BaseMod
             if stats.round_won {
                 stats.enemies_defeated += 1;
 
-                // RUNE LOGIC
                 if stats.equipped_runes.iter().any(|r| r.name == "Reaper") {
                     let heal = if stats.round % 8 == 0 { 2 } else { 1 };
                     stats.max_hp += heal;
@@ -563,7 +562,6 @@ pub fn update_shop(rl: &RaylibHandle, state: &mut GameState, stats: &mut BaseMod
                     stats.ante += 1;
                 }
 
-                // SCALING LOGIC
                 let mut diff_mult = stats.ante_scaling;
                 if stats.equipped_runes.iter().any(|r| r.name == "Judgement") { diff_mult += 0.5; }
                 stats.target_score = (stats.target_score as f32 * diff_mult) as i32;
@@ -574,7 +572,6 @@ pub fn update_shop(rl: &RaylibHandle, state: &mut GameState, stats: &mut BaseMod
                 stats.active_ability = ability;
                 if let BossAbility::DoubleTarget = stats.active_ability { stats.target_score *= 2; }
             } else {
-                // LOSS Logic
                 if stats.equipped_runes.iter().any(|r| r.name == "Midas") {
                     let penalty = (stats.money as f32 * 0.25) as i32;
                     stats.money -= penalty;
@@ -588,12 +585,10 @@ pub fn update_shop(rl: &RaylibHandle, state: &mut GameState, stats: &mut BaseMod
             stats.chips = 0;
             stats.mult = 0;
 
-            // Re-apply Persistent Rune Buffs
             if stats.equipped_runes.iter().any(|r| r.name == "Greed") {
                 stats.hands_remaining += 1;
                 stats.discards_remaining += 1;
             }
-            // Re-apply Minor Stat Runes (Base display)
             if stats.equipped_runes.iter().any(|r| r.name == "Force") { stats.mult = 10; }
             if stats.equipped_runes.iter().any(|r| r.name == "Flow") { stats.chips = 10; }
 

@@ -603,25 +603,19 @@ fn draw_shop(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
     let title = "SHOP / REST AREA";
     let w = d.measure_text(title, 60);
     d.draw_text(title, (SCREEN_WIDTH as i32 - w)/2, 100, 60, NEU_ORANGE);
+
     let info = format!("HP: {}/{}  |  Money: ${}", stats.current_hp, stats.max_hp, stats.money);
     let info_w = d.measure_text(&info, 30);
     d.draw_text(&info, (SCREEN_WIDTH as i32 - info_w)/2, 200, 30, PARCHMENT);
+
     let btn_rect = Rectangle::new(SCREEN_WIDTH/2.0 - 100.0, SCREEN_HEIGHT/2.0 + 100.0, 200.0, 60.0);
     let (off, shad) = get_button_offset(d, btn_rect);
     d.draw_rectangle_rounded(Rectangle::new(btn_rect.x, btn_rect.y+shad, btn_rect.width, btn_rect.height), 0.2, 4, Color::BLACK.alpha(0.5));
     d.draw_rectangle_rounded(Rectangle::new(btn_rect.x, btn_rect.y+off, btn_rect.width, btn_rect.height), 0.2, 4, NEU_BLUE);
+
     let btn_text = if stats.round_won { "NEXT FIGHT" } else { "RETRY ROUND" };
     let text_w = d.measure_text(btn_text, 20);
     d.draw_text(btn_text, (btn_rect.x + (btn_rect.width - text_w as f32)/2.0) as i32, (btn_rect.y + 20.0 + off) as i32, 20, PARCHMENT);
-}
-
-fn draw_stat_box(d: &mut RaylibDrawHandle, label: &str, val: i32, color: Color, x: f32, y: f32) {
-    let rect = Rectangle::new(x, y, 100.0, 70.0);
-    d.draw_rectangle_rounded(Rectangle::new(rect.x+3.0, rect.y+3.0, rect.width, rect.height), 0.1, 4, Color::BLACK.alpha(0.5));
-    d.draw_rectangle_rounded(rect, 0.1, 4, NEU_BLACK);
-    d.draw_rectangle_rounded_lines_ex(rect, 0.1, 4, 2.0, color);
-    d.draw_text(label, (x + 15.0) as i32, (y + 10.0) as i32, 16, color);
-    d.draw_text(&format!("{}", val), (x + 40.0) as i32, (y + 35.0) as i32, 30, PARCHMENT);
 }
 
 fn draw_dev_toolbox(d: &mut RaylibDrawHandle) {
@@ -780,4 +774,19 @@ fn draw_single_card(d: &mut RaylibDrawHandle, card: &Card, assets: &GameAssets) 
         card.rotation * 57.29,
         tint
     );
+
+}
+fn draw_stat_box(d: &mut RaylibDrawHandle, label: &str, val: i32, color: Color, x: f32, y: f32) {
+    let rect = Rectangle::new(x, y, 100.0, 70.0);
+
+    // Draw Shadow
+    d.draw_rectangle_rounded(Rectangle::new(rect.x+3.0, rect.y+3.0, rect.width, rect.height), 0.1, 4, Color::BLACK.alpha(0.5));
+
+    // Draw Body
+    d.draw_rectangle_rounded(rect, 0.1, 4, NEU_BLACK);
+    d.draw_rectangle_rounded_lines_ex(rect, 0.1, 4, 2.0, color);
+
+    // Draw Text
+    d.draw_text(label, (x + 15.0) as i32, (y + 10.0) as i32, 16, color);
+    d.draw_text(&format!("{}", val), (x + 40.0) as i32, (y + 35.0) as i32, 30, PARCHMENT);
 }

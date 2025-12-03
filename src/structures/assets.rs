@@ -14,19 +14,19 @@ pub struct GameAssets {
 
 impl GameAssets {
     pub fn load(rl: &mut RaylibHandle, thread: &RaylibThread) -> Self {
+        // Load Sprite Sheet
         let mut tex_spritesheet = rl.load_texture(thread, "assets/resprite-cards/spritesheet.png")
-            .expect("Failed to load spritesheet at assets/resprite-cards/spritesheet.png");
+            .expect("Failed to load spritesheet. Ensure 'assets/resprite-cards/spritesheet.png' exists.");
 
         tex_spritesheet.set_texture_filter(thread, TextureFilter::TEXTURE_FILTER_BILINEAR);
 
-        // FIX: Try to load the new background; fall back to the old one if missing to prevent crash.
-        let tex_background = rl.load_texture(thread, "assets/bg/Final_bg.png")
-            .or_else(|_| {
-                println!("WARNING: Could not find 'assets/Final_bg.png'. Reverting to default background.");
-                rl.load_texture(thread, "assets/bg/Mini_Text_Castle.png")
-            })
-            .expect("Failed to load background (checked both Final_bg.png and Mini_Text_Castle.png)");
+        // FIX: Robust Background Loading (Checks multiple paths)
+        let tex_background = rl.load_texture(thread, "assets/Final_bg.png") // Try Root
+            .or_else(|_| rl.load_texture(thread, "assets/bg/Final_bg.png")) // Try Subfolder
+            .or_else(|_| rl.load_texture(thread, "assets/bg/Mini_Text_Castle.png")) // Fallback
+            .expect("CRITICAL ERROR: Could not find ANY background image. Please ensure 'assets/Final_bg.png' exists.");
 
+        // Load UI Elements
         let banner_path = "assets/ui/UI_Flat_Banner04a.png";
         let tex_banner = rl.load_texture(thread, banner_path).expect("Failed to load UI banner");
 
