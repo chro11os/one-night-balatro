@@ -1,9 +1,8 @@
 use raylib::prelude::*;
-use crate::structures::stats::{BaseModifiers, BossAbility};
+use crate::structures::stats::{BaseModifiers, BossAbility, RuneType};
 use crate::structures::card::Card;
 use crate::structures::assets::GameAssets;
 use crate::structures::state::{GameState, AnimationState};
-use crate::structures::stats::{RuneType};
 use crate::consts::*;
 
 pub fn draw_scene(d: &mut RaylibDrawHandle, stats: &BaseModifiers, hand: &[Card], state: &GameState, assets: &GameAssets, anim: &AnimationState) {
@@ -24,11 +23,17 @@ pub fn draw_scene(d: &mut RaylibDrawHandle, stats: &BaseModifiers, hand: &[Card]
                 let mut d_cam = d.begin_mode2D(camera);
                 draw_enemy_monitor(&mut d_cam, stats, assets);
                 draw_player_panel(&mut d_cam, stats, assets);
-                draw_action_panel(&mut d_cam, stats, anim, assets);
+
+                // Pass 'hand' to check selection count limits
+                draw_action_panel(&mut d_cam, stats, anim, assets, hand);
+
                 draw_sort_buttons(&mut d_cam, assets);
                 draw_relics(&mut d_cam, stats);
+
+                // Draw cards with Z-ordering (Active cards on top)
                 draw_game_area(&mut d_cam, hand, assets, stats);
 
+                // Draw Floating Text (VFX)
                 for ft in &stats.floating_texts {
                     let alpha = (ft.life / ft.max_life).clamp(0.0, 1.0);
                     let color = ft.color.alpha(alpha);
@@ -36,6 +41,7 @@ pub fn draw_scene(d: &mut RaylibDrawHandle, stats: &BaseModifiers, hand: &[Card]
                     d_cam.draw_text(&ft.text, ft.pos.x as i32, ft.pos.y as i32, ft.size, color);
                 }
 
+                // Draw Particles (VFX)
                 for p in &stats.particles {
                     let alpha = (p.life / p.max_life).clamp(0.0, 1.0);
                     let color = p.color.alpha(alpha);
@@ -53,8 +59,11 @@ pub fn draw_scene(d: &mut RaylibDrawHandle, stats: &BaseModifiers, hand: &[Card]
             draw_shop(d, stats);
         },
         GameState::StatsMenu => {
-            draw_player_panel(d, stats, assets);
-            d.draw_rectangle(0, 0, SCREEN_WIDTH as i32, SCREEN_HEIGHT as i32, NEU_BLACK.alpha(0.8));
+            {
+                let mut d_cam = d.begin_mode2D(camera);
+                draw_player_panel(&mut d_cam, stats, assets);
+            }
+            d.draw_rectangle(0, 0, SCREEN_WIDTH as i32, SCREEN_HEIGHT as i32, NEU_BLACK.alpha(0.85));
             draw_stats_menu(d, stats);
         },
         GameState::BattleResult => {
@@ -71,123 +80,53 @@ pub fn draw_scene(d: &mut RaylibDrawHandle, stats: &BaseModifiers, hand: &[Card]
 }
 
 fn draw_game_area(d: &mut RaylibDrawHandle, hand: &[Card], assets: &GameAssets, _stats: &BaseModifiers) {
-    for card in hand {
+    // 1. Draw non-selected (Hand) cards first (Bottom Layer)
+    for card in hand.iter().filter(|c| !c.is_selected) {
+        draw_single_card(d, card, assets);
+    }
+    // 2. Draw selected (Scoring/Moving) cards last (Top Layer)
+    for card in hand.iter().filter(|c| c.is_selected) {
         draw_single_card(d, card, assets);
     }
 }
-fn draw_menu(d: &mut RaylibDrawHandle) {
-    let text = "ONE NIGHT BALATRO";
-    let font_size = 80;
-    let text_w = d.measure_text(text, font_size);
-    let x = (SCREEN_WIDTH as i32 - text_w) / 2;
-    let y = (SCREEN_HEIGHT as i32 / 2) - 100;
-    d.draw_text(text, x, y, font_size, PARCHMENT);
 
-    let sub = "Click to Start";
-    let sub_size = 40;
-    let sub_w = d.measure_text(sub, sub_size);
-    let sx = (SCREEN_WIDTH as i32 - sub_w) / 2;
-    d.draw_text(sub, sx, y + 100, sub_size, Color::GRAY);
-}
-
-fn draw_enemy_monitor(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _assets: &GameAssets) {
-    let w = 350.0;
-    let h = 220.0;
-    let x = ENEMY_CENTER_X - w / 2.0;
-    let y = ENEMY_Y;
-    d.draw_rectangle_rounded(Rectangle::new(x, y, w, h), 0.1, 4, Color::BLACK);
-    d.draw_rectangle_rounded_lines_ex(Rectangle::new(x, y, w, h), 0.1, 4, 6.0, Color::DARKGRAY);
-    d.draw_rectangle_rounded(Rectangle::new(x + 10.0, y + 10.0, w - 20.0, h - 40.0), 0.05, 4, Color::new(20, 30, 40, 255));
-    d.draw_text(&stats.enemy_name, (x + 20.0) as i32, (y + 30.0) as i32, 36, NEU_RED);
-
-    let ability_text = match stats.active_ability {
-        BossAbility::SilenceSuit(_) => "SILENCE",
-        BossAbility::HandSizeMinusOne => "HAND -1",
-        BossAbility::DoubleTarget => "HP x2",
-        BossAbility::PayToDiscard => "TAX $1",
-        _ => "",
-    };
-    if !ability_text.is_empty() {
-        d.draw_text(ability_text, (x + 20.0) as i32, (y + 80.0) as i32, 24, Color::RED);
-    }
-    let bar_w = w;
-    let bar_h = 24.0;
-    let bar_y = y + h + 15.0;
-    d.draw_rectangle(x as i32, bar_y as i32, bar_w as i32, bar_h as i32, Color::BLACK);
-    let hp_pct = (stats.display_score / stats.target_score as f32).clamp(0.0, 1.0);
-    d.draw_rectangle(x as i32, bar_y as i32, (bar_w * hp_pct) as i32, bar_h as i32, NEU_BLUE);
-    d.draw_rectangle_lines(x as i32, bar_y as i32, bar_w as i32, bar_h as i32, Color::GRAY);
-    d.draw_text(&format!("{:.0} / {}", stats.display_score, stats.target_score), (x + 5.0) as i32, (bar_y - 30.0) as i32, 24, Color::WHITE);
-}
-
-fn draw_player_panel(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _assets: &GameAssets) {
-    let x = P_PANEL_X;
-    let y = P_PANEL_Y;
-    let w = P_PANEL_W;
-    let h = P_PANEL_H;
-    d.draw_rectangle_rounded(Rectangle::new(x, y, w, h), 0.1, 4, NEU_BLACK.alpha(0.9));
-    d.draw_rectangle_rounded_lines_ex(Rectangle::new(x, y, w, h), 0.1, 4, 3.0, NEU_BLUE);
-
-    let hp_bar_h = 30.0;
-    let hp_margin = 20.0;
-    let hp_y = y + hp_margin;
-    let hp_w = w - hp_margin * 2.0;
-    d.draw_text("HP", (x + hp_margin) as i32, (hp_y - 25.0) as i32, 20, PARCHMENT);
-    d.draw_rectangle((x + hp_margin) as i32, hp_y as i32, hp_w as i32, hp_bar_h as i32, Color::BLACK);
-    let hp_pct = stats.current_hp as f32 / stats.max_hp as f32;
-    d.draw_rectangle((x + hp_margin) as i32, hp_y as i32, (hp_w * hp_pct) as i32, hp_bar_h as i32, NEU_RED);
-    d.draw_text(&format!("{}/{}", stats.current_hp, stats.max_hp), (x + hp_margin + 10.0) as i32, (hp_y + 5.0) as i32, 20, Color::WHITE);
-
-    let row2_y = hp_y + hp_bar_h + 20.0;
-    let box_w = (hp_w - 10.0) / 2.0;
-    let box_h = 60.0;
-    d.draw_rectangle_lines((x + hp_margin) as i32, row2_y as i32, box_w as i32, box_h as i32, NEU_ORANGE);
-    d.draw_text("MONEY", (x + hp_margin + 5.0) as i32, (row2_y + 5.0) as i32, 16, NEU_ORANGE);
-    d.draw_text(&format!("$ {}", stats.money), (x + hp_margin + 20.0) as i32, (row2_y + 25.0) as i32, 30, PARCHMENT);
-
-    let lvl_x = x + hp_margin + box_w + 10.0;
-    d.draw_rectangle_lines(lvl_x as i32, row2_y as i32, box_w as i32, box_h as i32, NEU_BLUE);
-    d.draw_text("LEVEL", (lvl_x + 5.0) as i32, (row2_y + 5.0) as i32, 16, NEU_BLUE);
-    d.draw_text(&format!("{}", stats.level), (lvl_x + 35.0) as i32, (row2_y + 25.0) as i32, 30, PARCHMENT);
-
-    let stat_y = row2_y + box_h + 15.0;
-    let stat_h = h - (stat_y - y) - 15.0;
-    d.draw_rectangle_lines((x + hp_margin) as i32, stat_y as i32, hp_w as i32, stat_h as i32, Color::GRAY);
-    d.draw_text(&format!("Ante: {}", stats.ante), (x + hp_margin + 10.0) as i32, (stat_y + 10.0) as i32, 20, Color::GRAY);
-    d.draw_text(&format!("Round: {}", stats.round), (x + hp_margin + 10.0) as i32, (stat_y + 35.0) as i32, 20, Color::GRAY);
-    d.draw_text(&format!("Crit: {:.0}%", stats.crit_chance * 100.0), (x + hp_margin + 130.0) as i32, (stat_y + 10.0) as i32, 20, NEU_YELLOW);
-}
-
-fn draw_action_panel(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _anim: &AnimationState, assets: &GameAssets) {
+fn draw_action_panel(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _anim: &AnimationState, assets: &GameAssets, hand: &[Card]) {
     let x = A_PANEL_X;
     let y = A_PANEL_Y;
     let w = A_PANEL_W;
     let h = A_PANEL_H;
     d.draw_rectangle_rounded(Rectangle::new(x, y, w, h), 0.1, 4, NEU_BLACK.alpha(0.9));
-    // Fixed: Used _ex for thickness
     d.draw_rectangle_rounded_lines_ex(Rectangle::new(x, y, w, h), 0.1, 4, 3.0, NEU_RED);
 
     let play_rect = Rectangle::new(PLAY_BTN_POS.x, PLAY_BTN_POS.y, BTN_WIDTH, BTN_HEIGHT);
     let disc_rect = Rectangle::new(DISC_BTN_POS.x, DISC_BTN_POS.y, BTN_WIDTH, BTN_HEIGHT);
 
-    let (off, shad) = get_button_offset(d, play_rect);
-    d.draw_texture_pro(&assets.tex_btn_play, Rectangle::new(0.0,0.0, assets.tex_btn_play.width as f32, assets.tex_btn_play.height as f32), Rectangle::new(play_rect.x, play_rect.y+shad, play_rect.width, play_rect.height), Vector2::zero(), 0.0, Color::BLACK.alpha(0.5));
-    d.draw_texture_pro(&assets.tex_btn_play, Rectangle::new(0.0,0.0, assets.tex_btn_play.width as f32, assets.tex_btn_play.height as f32), Rectangle::new(play_rect.x, play_rect.y+off, play_rect.width, play_rect.height), Vector2::zero(), 0.0, Color::WHITE);
-    d.draw_text("PLAY", (play_rect.x + 40.0) as i32, (play_rect.y + 15.0 + off) as i32, 24, Color::WHITE);
+    // Visual disable logic: > 0 AND <= 5
+    let selected_count = hand.iter().filter(|c| c.is_selected).count();
+    let can_play = selected_count > 0 && selected_count <= 5 && stats.hands_remaining > 0;
+    let can_disc = selected_count > 0 && selected_count <= 5 && stats.discards_remaining > 0;
 
-    let (off, shad) = get_button_offset(d, disc_rect);
-    d.draw_texture_pro(&assets.tex_btn_discard, Rectangle::new(0.0,0.0, assets.tex_btn_discard.width as f32, assets.tex_btn_discard.height as f32), Rectangle::new(disc_rect.x, disc_rect.y+shad, disc_rect.width, disc_rect.height), Vector2::zero(), 0.0, Color::BLACK.alpha(0.5));
-    d.draw_texture_pro(&assets.tex_btn_discard, Rectangle::new(0.0,0.0, assets.tex_btn_discard.width as f32, assets.tex_btn_discard.height as f32), Rectangle::new(disc_rect.x, disc_rect.y+off, disc_rect.width, disc_rect.height), Vector2::zero(), 0.0, Color::WHITE);
-    d.draw_text("DISC", (disc_rect.x + 40.0) as i32, (disc_rect.y + 15.0 + off) as i32, 24, Color::WHITE);
+    let (off_p, shad_p) = get_button_offset(d, play_rect);
+    let play_tint = if can_play { Color::WHITE } else { Color::GRAY };
 
-    d.draw_text(&format!("Hands: {}", stats.hands_remaining), (play_rect.x + 10.0) as i32, (play_rect.y + 60.0) as i32, 20, NEU_BLUE);
-    d.draw_text(&format!("Disc: {}", stats.discards_remaining), (disc_rect.x + 10.0) as i32, (disc_rect.y + 60.0) as i32, 20, NEU_RED);
+    d.draw_texture_pro(&assets.tex_btn_play, Rectangle::new(0.0,0.0, assets.tex_btn_play.width as f32, assets.tex_btn_play.height as f32), Rectangle::new(play_rect.x, play_rect.y+shad_p, play_rect.width, play_rect.height), Vector2::zero(), 0.0, Color::BLACK.alpha(0.5));
+    d.draw_texture_pro(&assets.tex_btn_play, Rectangle::new(0.0,0.0, assets.tex_btn_play.width as f32, assets.tex_btn_play.height as f32), Rectangle::new(play_rect.x, play_rect.y+off_p, play_rect.width, play_rect.height), Vector2::zero(), 0.0, play_tint);
+    d.draw_text("PLAY", (play_rect.x + 40.0) as i32, (play_rect.y + 15.0 + off_p) as i32, 24, play_tint);
+
+    let (off_d, shad_d) = get_button_offset(d, disc_rect);
+    let disc_tint = if can_disc { Color::WHITE } else { Color::GRAY };
+
+    d.draw_texture_pro(&assets.tex_btn_discard, Rectangle::new(0.0,0.0, assets.tex_btn_discard.width as f32, assets.tex_btn_discard.height as f32), Rectangle::new(disc_rect.x, disc_rect.y+shad_d, disc_rect.width, disc_rect.height), Vector2::zero(), 0.0, Color::BLACK.alpha(0.5));
+    d.draw_texture_pro(&assets.tex_btn_discard, Rectangle::new(0.0,0.0, assets.tex_btn_discard.width as f32, assets.tex_btn_discard.height as f32), Rectangle::new(disc_rect.x, disc_rect.y+off_d, disc_rect.width, disc_rect.height), Vector2::zero(), 0.0, disc_tint);
+    d.draw_text("DISC", (disc_rect.x + 40.0) as i32, (disc_rect.y + 15.0 + off_d) as i32, 24, disc_tint);
+
+    d.draw_text(&format!("Hands: {}", stats.hands_remaining), (play_rect.x + 10.0) as i32, (play_rect.y + 65.0) as i32, 18, NEU_BLUE);
+    d.draw_text(&format!("Disc: {}", stats.discards_remaining), (disc_rect.x + 10.0) as i32, (disc_rect.y + 65.0) as i32, 18, NEU_RED);
 
     let score_y = SCORE_BOX_Y;
     let score_h = h - (score_y - y) - 15.0;
     let score_rect = Rectangle::new(x + 15.0, score_y, w - 30.0, score_h);
     d.draw_rectangle_rounded(score_rect, 0.1, 4, Color::BLACK.alpha(0.5));
-    // Fixed: Used _ex for thickness
     d.draw_rectangle_rounded_lines_ex(score_rect, 0.1, 4, 2.0, Color::GRAY);
 
     let box_w = 110.0;
@@ -202,65 +141,57 @@ fn draw_action_panel(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _anim: &An
     d.draw_text(&format!("{}", stats.mult), (mult_x + 15.0) as i32, (chips_y + 20.0) as i32, 34, PARCHMENT);
 }
 
-fn draw_sort_buttons(d: &mut RaylibDrawHandle, _assets: &GameAssets) {
-    let rank_rect = Rectangle::new(SORT_RANK_POS.x, SORT_RANK_POS.y, SORT_BTN_WIDTH, SORT_BTN_HEIGHT);
-    let suit_rect = Rectangle::new(SORT_SUIT_POS.x, SORT_SUIT_POS.y, SORT_BTN_WIDTH, SORT_BTN_HEIGHT);
+fn draw_player_panel(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _assets: &GameAssets) {
+    let x = P_PANEL_X;
+    let y = P_PANEL_Y;
+    let w = P_PANEL_W;
+    let h = P_PANEL_H;
+    d.draw_rectangle_rounded(Rectangle::new(x, y, w, h), 0.1, 4, NEU_BLACK.alpha(0.9));
+    d.draw_rectangle_rounded_lines_ex(Rectangle::new(x, y, w, h), 0.1, 4, 3.0, NEU_BLUE);
 
-    d.draw_rectangle_rounded(rank_rect, 0.2, 4, NEU_ORANGE);
-    // Fixed: Used _ex for thickness
-    d.draw_rectangle_rounded_lines_ex(rank_rect, 0.2, 4, 2.0, Color::BLACK);
-    d.draw_text("Sort Rank", (rank_rect.x + 20.0) as i32, (rank_rect.y + 10.0) as i32, 20, Color::BLACK);
+    let hp_bar_h = 30.0;
+    let hp_margin = 20.0;
+    let hp_y = y + 40.0;
+    let hp_w = w - hp_margin * 2.0;
+    d.draw_text("HP", (x + hp_margin) as i32, (y + 15.0) as i32, 20, PARCHMENT);
+    d.draw_rectangle((x + hp_margin) as i32, hp_y as i32, hp_w as i32, hp_bar_h as i32, Color::BLACK);
+    let hp_pct = (stats.current_hp as f32 / stats.max_hp as f32).clamp(0.0, 1.0);
+    d.draw_rectangle((x + hp_margin) as i32, hp_y as i32, (hp_w * hp_pct) as i32, hp_bar_h as i32, NEU_RED);
+    d.draw_text(&format!("{}/{}", stats.current_hp, stats.max_hp), (x + hp_margin + 10.0) as i32, (hp_y + 5.0) as i32, 20, Color::WHITE);
 
-    d.draw_rectangle_rounded(suit_rect, 0.2, 4, NEU_BLUE);
-    // Fixed: Used _ex for thickness
-    d.draw_rectangle_rounded_lines_ex(suit_rect, 0.2, 4, 2.0, Color::BLACK);
-    d.draw_text("Sort Suit", (suit_rect.x + 20.0) as i32, (suit_rect.y + 10.0) as i32, 20, Color::BLACK);
-}
+    let row2_y = hp_y + hp_bar_h + 20.0;
+    let box_w = (hp_w - 10.0) / 2.0;
+    let box_h = 50.0;
+    d.draw_rectangle_lines((x + hp_margin) as i32, row2_y as i32, box_w as i32, box_h as i32, NEU_ORANGE);
+    d.draw_text("MONEY", (x + hp_margin + 5.0) as i32, (row2_y + 5.0) as i32, 16, NEU_ORANGE);
+    d.draw_text(&format!("$ {}", stats.money), (x + hp_margin + 20.0) as i32, (row2_y + 20.0) as i32, 24, PARCHMENT);
 
-fn get_button_offset(d: &RaylibDrawHandle, rect: Rectangle) -> (f32, f32) {
-    let mouse_pos = d.get_mouse_position();
-    let is_hovered = rect.check_collision_point_rec(mouse_pos);
-    let is_down = d.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT);
-    if is_hovered {
-        if is_down { return (4.0, 0.0); }
-        else { return (-2.0, 6.0); }
+    let lvl_x = x + hp_margin + box_w + 10.0;
+    d.draw_rectangle_lines(lvl_x as i32, row2_y as i32, box_w as i32, box_h as i32, NEU_BLUE);
+    d.draw_text("LEVEL", (lvl_x + 5.0) as i32, (row2_y + 5.0) as i32, 16, NEU_BLUE);
+    d.draw_text(&format!("{}", stats.level), (lvl_x + 35.0) as i32, (row2_y + 20.0) as i32, 24, PARCHMENT);
+
+    // Stats/Upgrade Button
+    let btn_rect = STATS_BTN_RECT;
+    let is_hover = btn_rect.check_collision_point_rec(d.get_mouse_position());
+
+    let mut color = Color::GRAY;
+    if stats.stat_points > 0 {
+        let alpha = ((d.get_time() * 5.0).sin() * 0.3 + 0.7) as f32;
+        color = NEU_YELLOW.alpha(alpha);
+    } else if is_hover {
+        color = Color::WHITE;
     }
-    (0.0, 3.0)
-}
 
-fn draw_relics(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
-    for (i, relic) in stats.equipped_relics.iter().enumerate() {
-        let x = RELIC_START_X + (i as f32 * RELIC_SPACING);
-        let y = RELIC_START_Y;
-        let rect = Rectangle::new(x, y, RELIC_SIZE, RELIC_SIZE);
-        d.draw_rectangle_rounded(rect, 0.2, 4, NEU_BLUE);
-        // Fixed: Used _ex for thickness
-        d.draw_rectangle_rounded_lines_ex(rect, 0.2, 4, 2.0, NEU_ORANGE);
-        let letter = &relic.name[0..1];
-        d.draw_text(letter, (x + 20.0) as i32, (y + 15.0) as i32, 30, PARCHMENT);
+    d.draw_rectangle_lines_ex(btn_rect, 2.0, color);
+    d.draw_text("UPGRADE STATS", (btn_rect.x + 40.0) as i32, (btn_rect.y + 15.0) as i32, 20, color);
+
+    if stats.stat_points > 0 {
+        d.draw_circle((btn_rect.x + btn_rect.width - 15.0) as i32, (btn_rect.y + 15.0) as i32, 8.0, NEU_RED);
+        d.draw_text("!", (btn_rect.x + btn_rect.width - 18.0) as i32, (btn_rect.y + 8.0) as i32, 14, Color::WHITE);
     }
 }
 
-fn draw_single_card(d: &mut RaylibDrawHandle, card: &Card, assets: &GameAssets) {
-    const SHEET_W: f32 = 5928.0;
-    const SHEET_H: f32 = 2848.0;
-    const COLS: f32 = 13.0;
-    const ROWS: f32 = 4.0;
-    let src_w = SHEET_W / COLS;
-    let src_h = SHEET_H / ROWS;
-
-    let col_idx = if card.value == 14 { 0 } else { card.value - 1 };
-    let row_idx = match card.suit { 0 => 0, 1 => 1, 2 => 3, 3 => 2, _ => 0 };
-    let source_rec = Rectangle::new(col_idx as f32 * src_w, row_idx as f32 * src_h, src_w, src_h);
-    let dest_width = CARD_WIDTH * card.scale;
-    let dest_height = CARD_HEIGHT * card.scale;
-    let dest_rect = Rectangle::new(card.current_pos.x, card.current_pos.y, dest_width, dest_height);
-    let origin = Vector2::new(dest_width / 2.0, dest_height / 2.0);
-    let tint = if card.is_hovered { Color::WHITE } else { Color::new(245, 245, 245, 255) };
-    d.draw_texture_pro(&assets.tex_spritesheet, source_rec, dest_rect, origin, card.rotation * 57.29, tint);
-}
-
-// Stubs
 fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
     let center_x = SCREEN_WIDTH / 2.0;
     let content_offset = RUNE_CONTENT_OFFSET;
@@ -289,7 +220,8 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
         if count == 0 { continue; }
 
         let spacing = RUNE_SPACING_X;
-        let start_x = (center_x + content_offset) - ((count as f32 - 1.0) * spacing) / 2.0;
+        let row_width = (count as f32 - 1.0) * spacing;
+        let start_x = (center_x + content_offset) - row_width / 2.0;
 
         for (i, rune) in row_runes.iter().enumerate() {
             let cx = start_x + (i as f32 * spacing);
@@ -319,7 +251,6 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
         }
     }
 
-    // --- MIDDLE INFO PANEL ---
     if !hovered_rune_name.is_empty() {
         let info_x = SCREEN_WIDTH / 2.0 - 60.0;
         let info_y = 250.0;
@@ -357,7 +288,6 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
         }
     }
 
-    // --- RIGHT SIDE LOADOUT PANEL ---
     let panel_x = SCREEN_WIDTH - 420.0;
     let panel_w = 380.0;
     let panel_h = SCREEN_HEIGHT - 200.0;
@@ -370,7 +300,6 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
     let mut benefits: Vec<String> = Vec::new();
     let mut downsides: Vec<String> = Vec::new();
 
-    // Logic to split single runes into Benefits vs Trade-offs
     for rune in &stats.equipped_runes {
         let name = &rune.name;
         match name.as_str() {
@@ -419,7 +348,6 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
 
     let mut list_y = 170.0;
 
-    // Draw BENEFITS (Green)
     d.draw_text("BENEFITS", (panel_x + 20.0) as i32, list_y as i32, 20, Color::GRAY);
     list_y += 30.0;
     for text in benefits {
@@ -427,10 +355,8 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
         list_y += 30.0;
     }
 
-    // Spacer
     list_y += 20.0;
 
-    // Draw TRADE-OFFS (Red)
     d.draw_text("TRADE-OFFS", (panel_x + 20.0) as i32, list_y as i32, 20, Color::GRAY);
     list_y += 30.0;
     for text in downsides {
@@ -438,7 +364,6 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
         list_y += 30.0;
     }
 
-    // --- START BUTTON ---
     let btn_w = 250.0;
     let btn_h = 70.0;
     let btn_x = center_x + content_offset - btn_w / 2.0;
@@ -451,7 +376,148 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
     d.draw_text("START RUN", (btn_x + 55.0) as i32, (btn_y + 20.0 + off) as i32, 28, Color::BLACK);
 }
 
+fn draw_stats_menu(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
+    let center_x = SCREEN_WIDTH / 2.0;
+    let center_y = SCREEN_HEIGHT / 2.0;
+    let box_w = 600.0;
+    let box_h = 500.0;
+
+    d.draw_rectangle_rounded(Rectangle::new(center_x - box_w/2.0, center_y - box_h/2.0, box_w, box_h), 0.05, 4, NEU_BLACK);
+    d.draw_rectangle_rounded_lines_ex(Rectangle::new(center_x - box_w/2.0, center_y - box_h/2.0, box_w, box_h), 0.05, 4, 3.0, NEU_ORANGE);
+
+    // Close Button
+    let close_btn_x = center_x + box_w/2.0 - 45.0;
+    let close_btn_y = center_y - box_h/2.0 + 15.0;
+    d.draw_rectangle(close_btn_x as i32, close_btn_y as i32, 30, 30, NEU_RED);
+    d.draw_text("X", (close_btn_x + 8.0) as i32, (close_btn_y + 5.0) as i32, 20, Color::WHITE);
+
+    d.draw_text("UPGRADES", (center_x - 100.0) as i32, (center_y - box_h/2.0 + 30.0) as i32, 40, NEU_ORANGE);
+    d.draw_text(&format!("Points Available: {}", stats.stat_points), (center_x - 120.0) as i32, (center_y - box_h/2.0 + 80.0) as i32, 30, PARCHMENT);
+
+    let start_y = center_y - 100.0;
+    let row_h = 60.0;
+    let btn_w = 120.0;
+    let btn_h = 40.0;
+
+    let stats_list = [
+        ("Max HP", format!("{}", stats.max_hp), "HP"),
+        ("Crit Chance", format!("{:.0}%", stats.crit_chance * 100.0), "Luck"),
+        ("Crit Dmg", format!("{:.1}x", stats.crit_mult), "Power"),
+    ];
+
+    for (i, (label, val, _desc)) in stats_list.iter().enumerate() {
+        let y = start_y + (i as f32 * row_h);
+        d.draw_text(label, (center_x - 200.0) as i32, y as i32, 30, Color::WHITE);
+        d.draw_text(val, (center_x - 20.0) as i32, y as i32, 30, NEU_YELLOW);
+
+        if stats.stat_points > 0 {
+            let btn_rect = Rectangle::new(center_x + 100.0, y, btn_w, btn_h);
+            d.draw_rectangle_rounded(btn_rect, 0.2, 4, NEU_GREEN);
+            d.draw_text("+ UPGRADE", (btn_rect.x + 10.0) as i32, (btn_rect.y + 10.0) as i32, 20, Color::BLACK);
+        }
+    }
+}
+
+// Helpers
+fn draw_sort_buttons(d: &mut RaylibDrawHandle, _assets: &GameAssets) {
+    let rank_rect = Rectangle::new(SORT_RANK_POS.x, SORT_RANK_POS.y, SORT_BTN_WIDTH, SORT_BTN_HEIGHT);
+    let suit_rect = Rectangle::new(SORT_SUIT_POS.x, SORT_SUIT_POS.y, SORT_BTN_WIDTH, SORT_BTN_HEIGHT);
+
+    d.draw_rectangle_rounded(rank_rect, 0.2, 4, NEU_ORANGE);
+    d.draw_rectangle_rounded_lines_ex(rank_rect, 0.2, 4, 2.0, Color::BLACK);
+    d.draw_text("Rank", (rank_rect.x + 40.0) as i32, (rank_rect.y + 10.0) as i32, 24, Color::BLACK);
+
+    d.draw_rectangle_rounded(suit_rect, 0.2, 4, NEU_BLUE);
+    d.draw_rectangle_rounded_lines_ex(suit_rect, 0.2, 4, 2.0, Color::BLACK);
+    d.draw_text("Suit", (suit_rect.x + 40.0) as i32, (suit_rect.y + 10.0) as i32, 24, Color::BLACK);
+}
+
+fn get_button_offset(d: &RaylibDrawHandle, rect: Rectangle) -> (f32, f32) {
+    let mouse_pos = d.get_mouse_position();
+    let is_hovered = rect.check_collision_point_rec(mouse_pos);
+    let is_down = d.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT);
+
+    if is_hovered {
+        if is_down { return (4.0, 0.0); }
+        else { return (-2.0, 6.0); }
+    }
+    (0.0, 3.0)
+}
+
+fn draw_relics(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
+    for (i, relic) in stats.equipped_relics.iter().enumerate() {
+        let x = RELIC_START_X + (i as f32 * RELIC_SPACING);
+        let y = RELIC_START_Y;
+        let rect = Rectangle::new(x, y, RELIC_SIZE, RELIC_SIZE);
+        d.draw_rectangle_rounded(rect, 0.2, 4, NEU_BLUE);
+        d.draw_rectangle_rounded_lines_ex(rect, 0.2, 4, 2.0, NEU_ORANGE);
+        let letter = &relic.name[0..1];
+        d.draw_text(letter, (x + 20.0) as i32, (y + 15.0) as i32, 30, PARCHMENT);
+    }
+}
+
+fn draw_single_card(d: &mut RaylibDrawHandle, card: &Card, assets: &GameAssets) {
+    const SHEET_W: f32 = 5928.0;
+    const SHEET_H: f32 = 2848.0;
+    const COLS: f32 = 13.0;
+    const ROWS: f32 = 4.0;
+    let src_w = SHEET_W / COLS;
+    let src_h = SHEET_H / ROWS;
+
+    let col_idx = if card.value == 14 { 0 } else { card.value - 1 };
+    let row_idx = match card.suit { 0 => 0, 1 => 1, 2 => 3, 3 => 2, _ => 0 };
+    let source_rec = Rectangle::new(col_idx as f32 * src_w, row_idx as f32 * src_h, src_w, src_h);
+    let dest_width = CARD_WIDTH * card.scale;
+    let dest_height = CARD_HEIGHT * card.scale;
+    let dest_rect = Rectangle::new(card.current_pos.x, card.current_pos.y, dest_width, dest_height);
+    let origin = Vector2::new(dest_width / 2.0, dest_height / 2.0);
+    let tint = if card.is_hovered { Color::WHITE } else { Color::new(245, 245, 245, 255) };
+    d.draw_texture_pro(&assets.tex_spritesheet, source_rec, dest_rect, origin, card.rotation * 57.29, tint);
+}
+
 fn draw_shop(d: &mut RaylibDrawHandle, _stats: &BaseModifiers) { d.draw_text("Shop", 100, 100, 20, Color::WHITE); }
-fn draw_stats_menu(d: &mut RaylibDrawHandle, _stats: &BaseModifiers) { d.draw_text("Stats Menu", 100, 100, 20, Color::WHITE); }
 fn draw_battle_result(d: &mut RaylibDrawHandle, _stats: &BaseModifiers) { d.draw_text("Battle Result", 100, 100, 20, Color::WHITE); }
 fn draw_dev_toolbox(_d: &mut RaylibDrawHandle) {}
+fn draw_menu(d: &mut RaylibDrawHandle) {
+    let text = "ONE NIGHT BALATRO";
+    let font_size = 80;
+    let text_w = d.measure_text(text, font_size);
+    let x = (SCREEN_WIDTH as i32 - text_w) / 2;
+    let y = (SCREEN_HEIGHT as i32 / 2) - 100;
+    d.draw_text(text, x, y, font_size, PARCHMENT);
+
+    let sub = "Click to Start";
+    let sub_size = 40;
+    let sub_w = d.measure_text(sub, sub_size);
+    let sx = (SCREEN_WIDTH as i32 - sub_w) / 2;
+    d.draw_text(sub, sx, y + 100, sub_size, Color::GRAY);
+}
+fn draw_enemy_monitor(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _assets: &GameAssets) {
+    let w = 350.0;
+    let h = 220.0;
+    let x = ENEMY_CENTER_X - w / 2.0;
+    let y = ENEMY_Y;
+    d.draw_rectangle_rounded(Rectangle::new(x, y, w, h), 0.1, 4, Color::BLACK);
+    d.draw_rectangle_rounded_lines_ex(Rectangle::new(x, y, w, h), 0.1, 4, 6.0, Color::DARKGRAY);
+    d.draw_rectangle_rounded(Rectangle::new(x + 10.0, y + 10.0, w - 20.0, h - 40.0), 0.05, 4, Color::new(20, 30, 40, 255));
+    d.draw_text(&stats.enemy_name, (x + 20.0) as i32, (y + 30.0) as i32, 36, NEU_RED);
+
+    let ability_text = match stats.active_ability {
+        BossAbility::SilenceSuit(_) => "SILENCE",
+        BossAbility::HandSizeMinusOne => "HAND -1",
+        BossAbility::DoubleTarget => "HP x2",
+        BossAbility::PayToDiscard => "TAX $1",
+        _ => "",
+    };
+    if !ability_text.is_empty() {
+        d.draw_text(ability_text, (x + 20.0) as i32, (y + 80.0) as i32, 24, Color::RED);
+    }
+    let bar_w = w;
+    let bar_h = 24.0;
+    let bar_y = y + h + 15.0;
+    d.draw_rectangle(x as i32, bar_y as i32, bar_w as i32, bar_h as i32, Color::BLACK);
+    let hp_pct = (stats.display_score / stats.target_score as f32).clamp(0.0, 1.0);
+    d.draw_rectangle(x as i32, bar_y as i32, (bar_w * hp_pct) as i32, bar_h as i32, NEU_BLUE);
+    d.draw_rectangle_lines(x as i32, bar_y as i32, bar_w as i32, bar_h as i32, Color::GRAY);
+    d.draw_text(&format!("{:.0} / {}", stats.display_score, stats.target_score), (x + 5.0) as i32, (bar_y - 30.0) as i32, 24, Color::WHITE);
+}

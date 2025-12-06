@@ -1,11 +1,11 @@
 use crate::poker;
 use raylib::prelude::*;
-use crate::structures::stats::{BaseModifiers, BossAbility, SortMode}; // FIX: Added SortMode
+use crate::structures::stats::{BaseModifiers, BossAbility, SortMode};
 use crate::structures::card::Card;
 use crate::structures::state::{GameState, AnimationState};
 use crate::consts::*;
 
-pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, _deck: &mut Vec<Card>, stats: &mut BaseModifiers, dt: f32, _state: &mut GameState, animation_state: &mut AnimationState, total_time: f32) {
+pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>, stats: &mut BaseModifiers, dt: f32, state: &mut GameState, animation_state: &mut AnimationState, total_time: f32) {
     let mouse_pos = rl.get_mouse_position();
     let mouse_pressed = rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT);
     let mouse_down = rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT);
@@ -13,11 +13,18 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, _deck: &mut Vec<Card
 
     let play_btn = Rectangle::new(PLAY_BTN_POS.x, PLAY_BTN_POS.y, BTN_WIDTH, BTN_HEIGHT);
     let discard_btn = Rectangle::new(DISC_BTN_POS.x, DISC_BTN_POS.y, BTN_WIDTH, BTN_HEIGHT);
-
     let sort_rank_btn = Rectangle::new(SORT_RANK_POS.x, SORT_RANK_POS.y, SORT_BTN_WIDTH, SORT_BTN_HEIGHT);
     let sort_suit_btn = Rectangle::new(SORT_SUIT_POS.x, SORT_SUIT_POS.y, SORT_BTN_WIDTH, SORT_BTN_HEIGHT);
 
+    // Update Visual Effects
+    stats.update_vfx(dt);
+
     if *animation_state == AnimationState::Idle {
+        if mouse_pressed && STATS_BTN_RECT.check_collision_point_rec(mouse_pos) {
+            *state = GameState::StatsMenu;
+            return;
+        }
+
         let mut hovered_index = None;
 
         for (i, card) in hand.iter_mut().enumerate().rev() {
@@ -31,6 +38,10 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, _deck: &mut Vec<Card
             }
         }
 
+        for (i, card) in hand.iter_mut().enumerate() {
+            card.is_hovered = Some(i) == hovered_index;
+        }
+
         if mouse_pressed {
             if let Some(idx) = hovered_index {
                 let card = &mut hand[idx];
@@ -41,16 +52,38 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, _deck: &mut Vec<Card
 
         if mouse_down {
             if let Some(idx) = hand.iter().position(|c| c.is_pressed) {
-                let card = &mut hand[idx];
-                card.target_pos = mouse_pos;
-                card.is_dragging = true;
+                if !hand[idx].is_dragging {
+                    let dx = mouse_pos.x - hand[idx].click_pos.x;
+                    let dy = mouse_pos.y - hand[idx].click_pos.y;
+                    if (dx*dx + dy*dy).sqrt() > 5.0 {
+                        hand[idx].is_dragging = true;
+                    }
+                }
+                if hand[idx].is_dragging {
+                    hand[idx].target_pos = mouse_pos;
+                    if idx > 0 {
+                        let left_x = hand[idx - 1].current_pos.x;
+                        if mouse_pos.x < left_x { hand.swap(idx, idx - 1); }
+                    }
+                    if let Some(new_idx) = hand.iter().position(|c| c.is_pressed) {
+                        if new_idx < hand.len() - 1 {
+                            let right_x = hand[new_idx + 1].current_pos.x;
+                            if mouse_pos.x > right_x { hand.swap(new_idx, new_idx + 1); }
+                        }
+                    }
+                }
             }
         }
 
         if mouse_released {
+            let selected_count = hand.iter().filter(|c| c.is_selected).count();
             for card in hand.iter_mut() {
                 if card.is_pressed && !card.is_dragging {
-                    card.is_selected = !card.is_selected;
+                    if !card.is_selected && selected_count >= 5 {
+                        // Locked
+                    } else {
+                        card.is_selected = !card.is_selected;
+                    }
                 }
                 card.is_pressed = false;
                 card.is_dragging = false;
@@ -60,15 +93,26 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, _deck: &mut Vec<Card
         if mouse_pressed {
             let selected_count = hand.iter().filter(|c| c.is_selected).count();
 
-            if play_btn.check_collision_point_rec(mouse_pos) && stats.hands_remaining > 0 && selected_count > 0 {
-                *animation_state = AnimationState::Playing;
-            }
-            if discard_btn.check_collision_point_rec(mouse_pos) && stats.discards_remaining > 0 && selected_count > 0 {
-                stats.discards_remaining -= 1;
-                hand.retain(|c| !c.is_selected);
+            // PLAY TRIGGER
+            if play_btn.check_collision_point_rec(mouse_pos) && stats.hands_remaining > 0 && selected_count > 0 && selected_count <= 5 {
+                *animation_state = AnimationState::Playing; // Start Move Animation
+                stats.score_timer = 0.0;
+                stats.score_index = 0;
             }
 
-            // --- SORT LOGIC ---
+            if discard_btn.check_collision_point_rec(mouse_pos) && stats.discards_remaining > 0 && selected_count > 0 && selected_count <= 5 {
+                stats.discards_remaining -= 1;
+                hand.retain(|c| !c.is_selected);
+                while hand.len() < stats.hand_size as usize {
+                    if let Some(mut new_card) = deck.pop() {
+                        new_card.current_pos = Vector2::new(DECK_X, DECK_Y);
+                        new_card.target_pos = Vector2::new(DECK_X, DECK_Y);
+                        hand.push(new_card);
+                    } else { break; }
+                }
+                sort_hand(hand, stats.current_sort);
+            }
+
             if sort_rank_btn.check_collision_point_rec(mouse_pos) {
                 stats.current_sort = SortMode::Rank;
                 sort_hand(hand, SortMode::Rank);
@@ -76,6 +120,106 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, _deck: &mut Vec<Card
             if sort_suit_btn.check_collision_point_rec(mouse_pos) {
                 stats.current_sort = SortMode::Suit;
                 sort_hand(hand, SortMode::Suit);
+            }
+        }
+    }
+    // --- ANIMATION PHASE 1: Move to Center ---
+    else if *animation_state == AnimationState::Playing {
+        let center_x = SCREEN_WIDTH / 2.0;
+        let selected_count = hand.iter().filter(|c| c.is_selected).count();
+        let spacing = 120.0;
+        let start_x = center_x - ((selected_count as f32 - 1.0) * spacing) / 2.0;
+
+        let mut idx = 0;
+        for card in hand.iter_mut() {
+            if card.is_selected {
+                card.target_pos.x = start_x + (idx as f32 * spacing);
+                card.target_pos.y = PLAY_AREA_Y;
+                card.target_scale = 1.1;
+                idx += 1;
+            }
+        }
+
+        let mut all_arrived = true;
+        for card in hand.iter() {
+            if card.is_selected {
+                if (card.current_pos - card.target_pos).length() > 10.0 {
+                    all_arrived = false;
+                    break;
+                }
+            }
+        }
+
+        if all_arrived {
+            *animation_state = AnimationState::ScoringSeq;
+            stats.score_timer = 0.0;
+            stats.score_index = 0;
+        }
+    }
+    // --- ANIMATION PHASE 2: Sequential Scoring ---
+    else if *animation_state == AnimationState::ScoringSeq {
+        stats.score_timer += dt;
+        let step_delay = 0.4;
+
+        // Get indices of selected cards
+        let selected_indices: Vec<usize> = hand.iter().enumerate()
+            .filter(|(_, c)| c.is_selected)
+            .map(|(i, _)| i)
+            .collect();
+
+        if stats.score_index < selected_indices.len() {
+            if stats.score_timer > step_delay {
+                let idx = selected_indices[stats.score_index];
+
+                // Visual Pop
+                hand[idx].scale = 1.4;
+
+                // Add Chips Logic
+                let chips = poker::get_card_chip_value(&hand[idx]);
+                stats.chips += chips;
+
+                // Spawn Effects
+                let pos = hand[idx].current_pos;
+                stats.spawn_floating_text(format!("+{}", chips), pos - Vector2::new(0.0, 80.0), NEU_BLUE);
+                stats.spawn_particle_burst(pos, NEU_YELLOW);
+
+                stats.score_index += 1;
+                stats.score_timer = 0.0;
+            }
+        } else {
+            // Finalize Hand
+            if stats.score_timer > 0.8 {
+                let selected: Vec<Card> = hand.iter().filter(|c| c.is_selected).cloned().collect();
+                let rank = poker::get_hand_rank(&selected);
+                let (base_chips, base_mult) = poker::get_hand_base_score(rank);
+
+                stats.chips += base_chips;
+                stats.mult += base_mult;
+
+                let final_score = stats.chips * stats.mult;
+                stats.total_score += final_score;
+                stats.display_score += final_score as f32;
+
+                hand.retain(|c| !c.is_selected);
+                stats.hands_remaining -= 1;
+
+                while hand.len() < stats.hand_size as usize {
+                    if let Some(mut new_card) = deck.pop() {
+                        new_card.current_pos = Vector2::new(DECK_X, DECK_Y);
+                        new_card.target_pos = Vector2::new(DECK_X, DECK_Y);
+                        hand.push(new_card);
+                    } else { break; }
+                }
+
+                sort_hand(hand, stats.current_sort);
+
+                // Reset Round Stats
+                stats.chips = 0;
+                stats.mult = 0;
+                if stats.equipped_runes.iter().any(|r| r.name == "Force") { stats.mult = 10; }
+                if stats.equipped_runes.iter().any(|r| r.name == "Flow") { stats.chips = 10; }
+
+                *animation_state = AnimationState::Idle;
             }
         }
     }
@@ -101,16 +245,12 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, _deck: &mut Vec<Card
 
 fn sort_hand(hand: &mut Vec<Card>, mode: SortMode) {
     match mode {
-        SortMode::Rank => {
-            hand.sort_by(|a, b| b.value.cmp(&a.value).then(a.suit.cmp(&b.suit)));
-        }
-        SortMode::Suit => {
-            hand.sort_by(|a, b| a.suit.cmp(&b.suit).then(b.value.cmp(&a.value)));
-        }
+        SortMode::Rank => hand.sort_by(|a, b| b.value.cmp(&a.value).then(a.suit.cmp(&b.suit))),
+        SortMode::Suit => hand.sort_by(|a, b| a.suit.cmp(&b.suit).then(b.value.cmp(&a.value))),
     }
 }
 
-fn calculate_hand_positions(hand: &mut Vec<Card>, _anim_state: &AnimationState) {
+fn calculate_hand_positions(hand: &mut Vec<Card>, anim_state: &AnimationState) {
     let count = hand.len();
     if count == 0 { return; }
     let center_x = SCREEN_WIDTH / 2.0;
@@ -119,16 +259,64 @@ fn calculate_hand_positions(hand: &mut Vec<Card>, _anim_state: &AnimationState) 
     let start_x = center_x - total_w / 2.0;
 
     for (i, card) in hand.iter_mut().enumerate() {
+        // Don't override position if animating
+        if (*anim_state == AnimationState::Playing || *anim_state == AnimationState::ScoringSeq) && card.is_selected {
+            continue;
+        }
+
         if card.is_dragging { continue; }
+
         card.target_pos.x = start_x + (i as f32 * card_spacing);
-        if card.is_selected { card.target_pos.y = HAND_Y_POS - 40.0; } else { card.target_pos.y = HAND_Y_POS; }
+        if card.is_selected {
+            card.target_pos.y = HAND_Y_POS - 40.0;
+        } else {
+            card.target_pos.y = HAND_Y_POS;
+        }
     }
 }
 
-// FIX: Only one definition of update_menu now
-pub fn update_menu(rl: &RaylibHandle, state: &mut GameState) {
-    if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-        *state = GameState::RuneSelect;
+pub fn update_stats_menu(rl: &RaylibHandle, state: &mut GameState, stats: &mut BaseModifiers) {
+    if rl.is_key_pressed(KeyboardKey::KEY_ESCAPE) {
+        *state = GameState::Playing;
+    }
+
+    let mouse_pos = rl.get_mouse_position();
+    let clicked = rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT);
+
+    let center_x = SCREEN_WIDTH / 2.0;
+    let center_y = SCREEN_HEIGHT / 2.0;
+    let box_w = 600.0;
+    let box_h = 500.0;
+    let start_y = center_y - 100.0;
+
+    let close_btn_x = center_x + box_w/2.0 - 45.0;
+    let close_btn_y = center_y - box_h/2.0 + 15.0;
+    let close_btn = Rectangle::new(close_btn_x, close_btn_y, 30.0, 30.0);
+
+    if clicked && close_btn.check_collision_point_rec(mouse_pos) {
+        *state = GameState::Playing;
+    }
+
+    if stats.stat_points > 0 && clicked {
+        let btn_w = 120.0;
+        let btn_h = 40.0;
+        let btn_x = center_x + 100.0;
+
+        let rect_hp = Rectangle::new(btn_x, start_y, btn_w, btn_h);
+        let rect_crit = Rectangle::new(btn_x, start_y + 60.0, btn_w, btn_h);
+        let rect_dmg = Rectangle::new(btn_x, start_y + 120.0, btn_w, btn_h);
+
+        if rect_hp.check_collision_point_rec(mouse_pos) {
+            stats.max_hp += 10;
+            stats.current_hp += 10;
+            stats.stat_points -= 1;
+        } else if rect_crit.check_collision_point_rec(mouse_pos) {
+            stats.crit_chance += 0.05;
+            stats.stat_points -= 1;
+        } else if rect_dmg.check_collision_point_rec(mouse_pos) {
+            stats.crit_mult += 0.5;
+            stats.stat_points -= 1;
+        }
     }
 }
 
@@ -154,13 +342,13 @@ pub fn update_rune_select(rl: &RaylibHandle, state: &mut GameState, stats: &mut 
             if count == 0 { continue; }
 
             let spacing = RUNE_SPACING_X;
-            let start_x = (center_x + content_offset) - ((count as f32 - 1.0) * spacing) / 2.0;
+            let row_width = (count as f32 - 1.0) * spacing;
+            let start_x = (center_x + content_offset) - row_width / 2.0;
 
             for (i, rune) in row_runes.iter().enumerate() {
                 let x = start_x + (i as f32 * spacing);
                 let y = *y_pos;
                 let dist = ((mouse_pos.x - x).powi(2) + (mouse_pos.y - y).powi(2)).sqrt();
-
                 if dist < RUNE_RADIUS {
                     stats.equipped_runes.retain(|r| r.rune_type != *r_type);
                     stats.equipped_runes.push((*rune).clone());
@@ -177,33 +365,21 @@ pub fn update_rune_select(rl: &RaylibHandle, state: &mut GameState, stats: &mut 
         if btn_rect.check_collision_point_rec(mouse_pos) {
             stats.shop_price_mult = 1.0;
             stats.ante_scaling = 1.5;
+            stats.stat_points = 3;
 
             for rune in &stats.equipped_runes {
                 match rune.name.as_str() {
-                    "Paladin" => {
-                        stats.max_hp += 40;
-                        stats.current_hp += 40;
-                    },
+                    "Paladin" => { stats.max_hp += 40; stats.current_hp += 40; },
                     "Reaper" => {
                         stats.max_hp -= 15;
                         if stats.max_hp < 1 { stats.max_hp = 1; }
                         stats.current_hp = stats.max_hp;
                     },
-                    "Judgement" => {
-                        stats.ante_scaling = 2.0; // "Hard Mode" scaling
-                        // Note: "Balanced Calc" logic needs to be in poker.rs scoring
-                    },
-                    "Greed" => {
-                        stats.hands_remaining += 1;
-                        stats.discards_remaining += 1;
-                    },
-                    "Investment" => {
-                        stats.money = 0;
-                    },
+                    "Judgement" => stats.ante_scaling = 2.0,
+                    "Greed" => { stats.hands_remaining += 1; stats.discards_remaining += 1; },
+                    "Investment" => stats.money = 0,
                     "Merchant" => stats.shop_price_mult = 1.2,
-                    "Evolution" => {
-                        stats.ante_scaling = 2.25; // 1.5 * 1.5 approx
-                    },
+                    "Evolution" => stats.ante_scaling = 2.25,
                     "Force" => stats.mult += 10,
                     "Flow" => stats.chips += 10,
                     "Wealth" => stats.money += 3,
@@ -215,10 +391,14 @@ pub fn update_rune_select(rl: &RaylibHandle, state: &mut GameState, stats: &mut 
     }
 }
 
+pub fn update_menu(rl: &RaylibHandle, state: &mut GameState) {
+    if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
+        *state = GameState::RuneSelect;
+    }
+}
 pub fn update_shop(rl: &RaylibHandle, state: &mut GameState, _stats: &mut BaseModifiers, _hand: &mut Vec<Card>, _deck: &mut Vec<Card>) {
     if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
         *state = GameState::Playing;
     }
 }
-pub fn update_stats_menu(_rl: &RaylibHandle, _state: &mut GameState, _stats: &mut BaseModifiers) {}
 pub fn update_battle_result(_rl: &RaylibHandle, _state: &mut GameState, _stats: &mut BaseModifiers) {}

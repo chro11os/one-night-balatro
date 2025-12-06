@@ -1,16 +1,14 @@
 use raylib::prelude::*;
-use serde::{Serialize, Deserialize}; // NEW: Import Serde
+use serde::{Serialize, Deserialize};
 use crate::structures::state::GameState;
 use crate::structures::hand::HandRank;
 use crate::structures::data_loader::{EnemyData, RelicData};
 
-// NEW: Added Serialize, Deserialize to Enum
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum RuneType {
     Red, Blue, Green, Minor,
 }
 
-// NEW: Added Serialize, Deserialize to Struct
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Rune {
     pub id: String,
@@ -90,8 +88,11 @@ pub struct BaseModifiers {
     pub equipped_relics: Vec<RelicData>,
     pub enemy_database: Option<EnemyData>,
     pub relic_database: Vec<RelicData>,
+
+    // VFX Fields
     pub floating_texts: Vec<FloatingText>,
     pub particles: Vec<Particle>,
+
     pub previous_state: GameState,
     pub current_sort: SortMode,
     pub screen_shake: Vector2,
@@ -108,17 +109,17 @@ impl Default for BaseModifiers {
     fn default() -> Self {
         Self {
             level: 1, xp: 0, xp_target: 100, stat_points: 0, current_hp: 100, max_hp: 100, money: 10,
-            hands_remaining: 4, discards_remaining: 3, hand_size: 8, ante: 1, round: 1, enemies_defeated: 0, round_won: false,
+            hands_remaining: 4, discards_remaining: 5, hand_size: 8, ante: 1, round: 1, enemies_defeated: 0, round_won: false,
             crit_chance: 0.10, crit_mult: 1.5, chips: 0, mult: 0, total_score: 0, display_score: 0.0, target_score: 300,
             deck_count: 52, hand_rank: None,
             enemy_name: "Giant Rat".to_string(), enemy_damage: 10, active_ability: BossAbility::None,
+            equipped_runes: Vec::new(), available_runes: Vec::new(), equipped_relics: Vec::new(),
+            enemy_database: None, relic_database: Vec::new(),
 
-            equipped_runes: Vec::new(),
-            available_runes: Vec::new(), // UPDATED: Now starts empty, loaded in main
-            equipped_relics: Vec::new(),
-            enemy_database: None,
-            relic_database: Vec::new(),
-            floating_texts: Vec::new(), particles: Vec::new(),
+            // Init empty VFX lists
+            floating_texts: Vec::new(),
+            particles: Vec::new(),
+
             previous_state: GameState::Menu, current_sort: SortMode::Rank,
             screen_shake: Vector2::zero(), shake_timer: 0.0,
             is_crit_active: false, score_index: 0, score_timer: 0.0, score_delay: 0.0,
@@ -127,5 +128,55 @@ impl Default for BaseModifiers {
     }
 }
 
-// REMOVED: impl BaseModifiers { init_runes() ... }
-// Logic moved to JSON
+impl BaseModifiers {
+    pub fn update_vfx(&mut self, dt: f32) {
+        // Update Floating Text
+        self.floating_texts.retain_mut(|ft| {
+            ft.life -= dt;
+            ft.pos += ft.vel * dt;
+            ft.vel.y *= 0.95; // Drag
+            ft.life > 0.0
+        });
+
+        // Update Particles
+        self.particles.retain_mut(|p| {
+            p.life -= dt;
+            p.pos += p.vel * dt;
+            p.rotation += p.rot_speed * dt;
+            p.vel.y += 800.0 * dt; // Gravity
+            p.life > 0.0
+        });
+    }
+
+    pub fn spawn_floating_text(&mut self, text: String, pos: Vector2, color: Color) {
+        self.floating_texts.push(FloatingText {
+            pos,
+            vel: Vector2::new(0.0, -100.0), // Shoot up
+            text,
+            color,
+            size: 40,
+            life: 1.2,
+            max_life: 1.2,
+        });
+    }
+
+    pub fn spawn_particle_burst(&mut self, pos: Vector2, color: Color) {
+        for _ in 0..15 {
+            let angle = unsafe { raylib::ffi::GetRandomValue(0, 360) } as f32 * 0.0174533;
+            let speed = unsafe { raylib::ffi::GetRandomValue(150, 400) } as f32;
+            let vel = Vector2::new(angle.cos() * speed, angle.sin() * speed);
+            let size = unsafe { raylib::ffi::GetRandomValue(6, 14) } as f32;
+
+            self.particles.push(Particle {
+                pos,
+                vel,
+                color,
+                size,
+                life: 0.6,
+                max_life: 0.6,
+                rotation: 0.0,
+                rot_speed: unsafe { raylib::ffi::GetRandomValue(-300, 300) } as f32,
+            });
+        }
+    }
+}
