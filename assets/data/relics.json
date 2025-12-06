@@ -1,0 +1,32 @@
+[
+  {
+    "id": "relic_feather",
+    "name": "Phoenix Feather",
+    "description": "On Death: Resurrect with 20% HP. Destroyed on use.",
+    "value": 0
+  },
+  {
+    "id": "relic_echo",
+    "name": "Echo Crystal",
+    "description": "Retrigger all playing cards 1 time.",
+    "value": 0
+  },
+  {
+    "id": "relic_daggers",
+    "name": "Twin Daggers",
+    "description": "Gain +1 Mult for every Pair or Two Pair played.",
+    "value": 0
+  },
+  {
+    "id": "relic_torch",
+    "name": "Fading Torch",
+    "description": "+20 Mult. Decreases by 3 Mult at end of round.",
+    "value": 20
+  },
+  {
+    "id": "relic_bag",
+    "name": "Bag of Holding",
+    "description": "+1 Hand Size, +1 Discard.",
+    "value": 0
+  }
+]

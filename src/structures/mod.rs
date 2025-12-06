@@ -5,3 +5,4 @@ pub mod assets;
 pub mod state;
 pub mod hand;
 pub mod joker_stats;
+pub mod data_loader;

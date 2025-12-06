@@ -1,0 +1,11 @@
+{
+  "tier_1": ["Giant Rat", "Slime Puddle", "Kobold Thief", "Rusted Armor", "Goblin Grunt"],
+  "tier_2": ["Orc Berserker", "Shadow Stalker", "Dungeon Mimic", "Cave Troll", "Skeletal Mage"],
+  "tier_3": ["Stone Golem", "Vampire Lord", "Dark Paladin", "Beholder", "Void Elemental"],
+  "bosses": [
+    { "name": "The Lich King", "ability": "SilenceSuit", "param": 2 },
+    { "name": "Ancient Red Dragon", "ability": "HandSizeMinusOne", "param": 0 },
+    { "name": "King of Spades", "ability": "DoubleTarget", "param": 0 },
+    { "name": "The Dealer", "ability": "PayToDiscard", "param": 0 }
+  ]
+}

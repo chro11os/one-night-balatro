@@ -1,0 +1,17 @@
+[
+  { "id": "r1", "name": "Paladin", "description": "Start with +40 Max HP.\nBUT: Mult from Relics is reduced by 10%.", "rune_type": "Red", "cost": 0 },
+  { "id": "r2", "name": "Reaper", "description": "-15 Max HP.\nGain Lifesteal: Recover HP when defeating enemies.", "rune_type": "Red", "cost": 0 },
+  { "id": "r3", "name": "Judgement", "description": "Balanced Calc (Chips/Mult).\nBUT: Enemies have 2x HP.", "rune_type": "Red", "cost": 0 },
+
+  { "id": "u1", "name": "Midas", "description": "Gain 25% of Gold on Win.\nLose 25% of Gold on Defeat.", "rune_type": "Blue", "cost": 0 },
+  { "id": "u2", "name": "Greed", "description": "+1 Hand Size, +1 Discard.\nBUT: -1 Relic Slot.", "rune_type": "Blue", "cost": 0 },
+  { "id": "g3", "name": "Evolution", "description": "Relics 1.5x Value & Stats.\nBUT: Enemies have 1.5x HP.", "rune_type": "Blue", "cost": 0 },
+
+  { "id": "g1", "name": "Merchant", "description": "+1 Shop Slot.\nBUT: Shop prices are 20% higher.", "rune_type": "Green", "cost": 0 },
+  { "id": "g2", "name": "Mentalist", "description": "Scrolls are Free.\nBUT: Scrolls appear less often.", "rune_type": "Green", "cost": 0 },
+  { "id": "u3", "name": "Investment", "description": "Earn +5% Interest per round.\nBUT: Start with $0.", "rune_type": "Green", "cost": 0 },
+
+  { "id": "m1", "name": "Force", "description": "+10 Base Mult.\nSolid early game damage.", "rune_type": "Minor", "cost": 0 },
+  { "id": "m2", "name": "Flow", "description": "+10 Base Chips.\nConsistent scoring.", "rune_type": "Minor", "cost": 0 },
+  { "id": "m3", "name": "Wealth", "description": "+3 Gold per Round.\nSteady income.", "rune_type": "Minor", "cost": 0 }
+]
