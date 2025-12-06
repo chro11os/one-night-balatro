@@ -1,7 +1,7 @@
 use crate::structures::card::Card;
 use crate::structures::hand::HandRank;
 use std::collections::HashMap;
-
+use crate::structures::stats::BaseModifiers; // Added this import
 // ... [get_counts, is_flush, is_straight, get_hand_base_score, get_card_chip_value remain exactly the same] ...
 // (Paste previous helper functions here if replacing file, or append this new function)
 
@@ -91,7 +91,37 @@ pub fn get_hand_rank(hand: &[Card]) -> HandRank {
 
     HandRank::HighCard
 }
+pub fn apply_relic_bonuses(stats: &mut BaseModifiers, hand: &[Card]) {
+    let rank = get_hand_rank(hand);
 
+    // Clone relics to avoid immutable borrow of stats while mutating it
+    let relics = stats.equipped_relics.clone();
+
+    for relic in relics {
+        match relic.id.as_str() {
+            "j_joker" => {
+                stats.mult += 4;
+            },
+            "j_greedy" => {
+                // Suit 1 is Diamonds (0=Heart, 1=Diamond, 2=Spade, 3=Club)
+                let diamonds = hand.iter().filter(|c| c.suit == 1).count();
+                if diamonds > 0 {
+                    stats.chips += (diamonds as i32) * 10;
+                }
+            },
+            "j_duo" => {
+                if rank == HandRank::Pair { stats.mult *= 2; }
+            },
+            "j_trio" => {
+                if rank == HandRank::ThreeOfAKind { stats.mult *= 3; }
+            },
+            "j_family" => {
+                if rank == HandRank::FourOfAKind { stats.mult *= 4; }
+            },
+            _ => {}
+        }
+    }
+}
 // NEW: Helper to identify which cards actully contribute to the hand
 pub fn get_scoring_ids(hand: &[Card]) -> Vec<i32> {
     let rank = get_hand_rank(hand);

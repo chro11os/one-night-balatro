@@ -12,6 +12,9 @@ pub struct GameAssets {
     pub tex_panel_blue: Texture2D,
     pub tex_panel_orange: Texture2D,
 
+    // NEW: Global Font
+    pub font_main: Font,
+
     // Store Rune Icons
     pub rune_icons: HashMap<String, Texture2D>,
 }
@@ -41,6 +44,10 @@ impl GameAssets {
         let tex_panel_blue = rl.load_texture(thread, banner_path).unwrap();
         let tex_panel_orange = rl.load_texture(thread, banner_path).unwrap();
 
+        // FIX: Directly expect the font. Do not use get_font_default() here.
+        let font_main = rl.load_font(thread, "assets/fonts/BoldPixels.ttf")
+            .expect("Failed to load font: assets/fonts/BoldPixels.ttf");
+
         // 2. Load Rune Icons
         let mut rune_icons = HashMap::new();
 
@@ -48,7 +55,6 @@ impl GameAssets {
             ("combat_style", vec!["Paladin", "Reaper", "Judgement"]),
             ("economy", vec!["Investment", "Mentalist", "Merchant"]),
             ("utility", vec!["Evolution", "Greed", "Midas"]),
-            // ADDED: starting_bonus category
             ("starting_bonus", vec!["Force", "Flow", "Wealth"]),
         ];
 
@@ -76,6 +82,7 @@ impl GameAssets {
             tex_btn_plus_disabled,
             tex_panel_blue,
             tex_panel_orange,
+            font_main,
             rune_icons,
         }
     }

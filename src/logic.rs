@@ -125,7 +125,7 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
 
         AnimationState::Playing => {
             // PHASE 1: Move Cards to Center
-            let center_x = SCREEN_WIDTH / 2.0; // Ensure this line is active
+            let center_x = SCREEN_WIDTH / 2.0;
             let selected_count = hand.iter().filter(|c| c.is_selected).count();
             let spacing = 120.0;
             let start_x = center_x - ((selected_count as f32 - 1.0) * spacing) / 2.0;
@@ -203,6 +203,9 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
             stats.chips += base_chips;
             stats.mult += base_mult;
 
+            // NEW: Apply Relic (Joker) Bonuses before final calc
+            poker::apply_relic_bonuses(stats, &selected);
+
             let final_score = stats.chips * stats.mult;
             stats.total_score += final_score;
 
@@ -231,6 +234,7 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
             stats.mult = 0;
             if stats.equipped_runes.iter().any(|r| r.name == "Force") { stats.mult = 10; }
             if stats.equipped_runes.iter().any(|r| r.name == "Flow") { stats.chips = 10; }
+            if stats.equipped_runes.iter().any(|r| r.name == "Wealth") { stats.money += 3; }
 
             *animation_state = AnimationState::Idle;
         }
@@ -249,6 +253,8 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
             let (chips, mult) = poker::get_hand_base_score(rank);
             stats.chips = chips;
             stats.mult = mult;
+            // Note: We don't apply relic bonuses here in preview to avoid complex clone/calc overhead,
+            // but you could add a 'preview_relic_bonuses' later if desired.
         } else {
             stats.chips = 0;
             stats.mult = 0;

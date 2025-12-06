@@ -105,17 +105,21 @@ fn draw_action_panel(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _anim: &An
 
     d.draw_texture_pro(&assets.tex_btn_play, Rectangle::new(0.0,0.0, assets.tex_btn_play.width as f32, assets.tex_btn_play.height as f32), Rectangle::new(play_rect.x, play_rect.y+shad_p, play_rect.width, play_rect.height), Vector2::zero(), 0.0, Color::BLACK.alpha(0.5));
     d.draw_texture_pro(&assets.tex_btn_play, Rectangle::new(0.0,0.0, assets.tex_btn_play.width as f32, assets.tex_btn_play.height as f32), Rectangle::new(play_rect.x, play_rect.y+off_p, play_rect.width, play_rect.height), Vector2::zero(), 0.0, play_tint);
-    d.draw_text("PLAY", (play_rect.x + 40.0) as i32, (play_rect.y + 15.0 + off_p) as i32, 24, play_tint);
+
+    // FONT UPDATE
+    d.draw_text_ex(&assets.font_main, "PLAY", Vector2::new(play_rect.x + 40.0, play_rect.y + 15.0 + off_p), 24.0, 1.0, play_tint);
 
     let (off_d, shad_d) = get_button_offset(d, disc_rect);
     let disc_tint = if can_disc { Color::WHITE } else { Color::GRAY };
 
     d.draw_texture_pro(&assets.tex_btn_discard, Rectangle::new(0.0,0.0, assets.tex_btn_discard.width as f32, assets.tex_btn_discard.height as f32), Rectangle::new(disc_rect.x, disc_rect.y+shad_d, disc_rect.width, disc_rect.height), Vector2::zero(), 0.0, Color::BLACK.alpha(0.5));
     d.draw_texture_pro(&assets.tex_btn_discard, Rectangle::new(0.0,0.0, assets.tex_btn_discard.width as f32, assets.tex_btn_discard.height as f32), Rectangle::new(disc_rect.x, disc_rect.y+off_d, disc_rect.width, disc_rect.height), Vector2::zero(), 0.0, disc_tint);
-    d.draw_text("DISC", (disc_rect.x + 40.0) as i32, (disc_rect.y + 15.0 + off_d) as i32, 24, disc_tint);
 
-    d.draw_text(&format!("Hands: {}", stats.hands_remaining), (play_rect.x + 10.0) as i32, (play_rect.y + 65.0) as i32, 18, NEU_BLUE);
-    d.draw_text(&format!("Disc: {}", stats.discards_remaining), (disc_rect.x + 10.0) as i32, (disc_rect.y + 65.0) as i32, 18, NEU_RED);
+    // FONT UPDATE
+    d.draw_text_ex(&assets.font_main, "DISC", Vector2::new(disc_rect.x + 40.0, disc_rect.y + 15.0 + off_d), 24.0, 1.0, disc_tint);
+
+    d.draw_text_ex(&assets.font_main, &format!("Hands: {}", stats.hands_remaining), Vector2::new(play_rect.x + 10.0, play_rect.y + 65.0), 18.0, 1.0, NEU_BLUE);
+    d.draw_text_ex(&assets.font_main, &format!("Disc: {}", stats.discards_remaining), Vector2::new(disc_rect.x + 10.0, disc_rect.y + 65.0), 18.0, 1.0, NEU_RED);
 
     let score_y = SCORE_BOX_Y;
     let score_h = h - (score_y - y) - 15.0;
@@ -128,14 +132,19 @@ fn draw_action_panel(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _anim: &An
     let chips_x = x + 25.0;
     let chips_y = score_y + 20.0;
     d.draw_texture_pro(&assets.tex_banner, Rectangle::new(0.0,0.0, assets.tex_banner.width as f32, assets.tex_banner.height as f32), Rectangle::new(chips_x, chips_y, box_w, box_h), Vector2::zero(), 0.0, NEU_BLUE);
-    d.draw_text(&format!("{}", stats.chips), (chips_x + 15.0) as i32, (chips_y + 20.0) as i32, 34, PARCHMENT);
-    d.draw_text("X", (chips_x + box_w + 10.0) as i32, (chips_y + 20.0) as i32, 34, Color::WHITE);
+
+    // FONT UPDATE
+    d.draw_text_ex(&assets.font_main, &format!("{}", stats.chips), Vector2::new(chips_x + 15.0, chips_y + 20.0), 34.0, 1.0, PARCHMENT);
+    d.draw_text_ex(&assets.font_main, "X", Vector2::new(chips_x + box_w + 10.0, chips_y + 20.0), 34.0, 1.0, Color::WHITE);
+
     let mult_x = chips_x + box_w + 40.0;
     d.draw_texture_pro(&assets.tex_banner, Rectangle::new(0.0,0.0, assets.tex_banner.width as f32, assets.tex_banner.height as f32), Rectangle::new(mult_x, chips_y, box_w, box_h), Vector2::zero(), 0.0, NEU_RED);
-    d.draw_text(&format!("{}", stats.mult), (mult_x + 15.0) as i32, (chips_y + 20.0) as i32, 34, PARCHMENT);
+
+    // FONT UPDATE
+    d.draw_text_ex(&assets.font_main, &format!("{}", stats.mult), Vector2::new(mult_x + 15.0, chips_y + 20.0), 34.0, 1.0, PARCHMENT);
 }
 
-fn draw_player_panel(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _assets: &GameAssets) {
+fn draw_player_panel(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &GameAssets) {
     let x = P_PANEL_X;
     let y = P_PANEL_Y;
     let w = P_PANEL_W;
@@ -147,23 +156,25 @@ fn draw_player_panel(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _assets: &
     let hp_margin = 20.0;
     let hp_y = y + 40.0;
     let hp_w = w - hp_margin * 2.0;
-    d.draw_text("HP", (x + hp_margin) as i32, (y + 15.0) as i32, 20, PARCHMENT);
+
+    // FONT UPDATE
+    d.draw_text_ex(&assets.font_main, "HP", Vector2::new(x + hp_margin, y + 15.0), 20.0, 1.0, PARCHMENT);
     d.draw_rectangle((x + hp_margin) as i32, hp_y as i32, hp_w as i32, hp_bar_h as i32, Color::BLACK);
     let hp_pct = (stats.current_hp as f32 / stats.max_hp as f32).clamp(0.0, 1.0);
     d.draw_rectangle((x + hp_margin) as i32, hp_y as i32, (hp_w * hp_pct) as i32, hp_bar_h as i32, NEU_RED);
-    d.draw_text(&format!("{}/{}", stats.current_hp, stats.max_hp), (x + hp_margin + 10.0) as i32, (hp_y + 5.0) as i32, 20, Color::WHITE);
+    d.draw_text_ex(&assets.font_main, &format!("{}/{}", stats.current_hp, stats.max_hp), Vector2::new(x + hp_margin + 10.0, hp_y + 5.0), 20.0, 1.0, Color::WHITE);
 
     let row2_y = hp_y + hp_bar_h + 20.0;
     let box_w = (hp_w - 10.0) / 2.0;
     let box_h = 50.0;
     d.draw_rectangle_lines((x + hp_margin) as i32, row2_y as i32, box_w as i32, box_h as i32, NEU_ORANGE);
-    d.draw_text("MONEY", (x + hp_margin + 5.0) as i32, (row2_y + 5.0) as i32, 16, NEU_ORANGE);
-    d.draw_text(&format!("$ {}", stats.money), (x + hp_margin + 20.0) as i32, (row2_y + 20.0) as i32, 24, PARCHMENT);
+    d.draw_text_ex(&assets.font_main, "MONEY", Vector2::new(x + hp_margin + 5.0, row2_y + 5.0), 16.0, 1.0, NEU_ORANGE);
+    d.draw_text_ex(&assets.font_main, &format!("$ {}", stats.money), Vector2::new(x + hp_margin + 20.0, row2_y + 20.0), 24.0, 1.0, PARCHMENT);
 
     let lvl_x = x + hp_margin + box_w + 10.0;
     d.draw_rectangle_lines(lvl_x as i32, row2_y as i32, box_w as i32, box_h as i32, NEU_BLUE);
-    d.draw_text("LEVEL", (lvl_x + 5.0) as i32, (row2_y + 5.0) as i32, 16, NEU_BLUE);
-    d.draw_text(&format!("{}", stats.level), (lvl_x + 35.0) as i32, (row2_y + 20.0) as i32, 24, PARCHMENT);
+    d.draw_text_ex(&assets.font_main, "LEVEL", Vector2::new(lvl_x + 5.0, row2_y + 5.0), 16.0, 1.0, NEU_BLUE);
+    d.draw_text_ex(&assets.font_main, &format!("{}", stats.level), Vector2::new(lvl_x + 35.0, row2_y + 20.0), 24.0, 1.0, PARCHMENT);
 
     // Stats/Upgrade Button
     let btn_rect = STATS_BTN_RECT;
@@ -178,11 +189,11 @@ fn draw_player_panel(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _assets: &
     }
 
     d.draw_rectangle_lines_ex(btn_rect, 2.0, color);
-    d.draw_text("UPGRADE STATS", (btn_rect.x + 40.0) as i32, (btn_rect.y + 15.0) as i32, 20, color);
+    d.draw_text_ex(&assets.font_main, "UPGRADE STATS", Vector2::new(btn_rect.x + 40.0, btn_rect.y + 15.0), 20.0, 1.0, color);
 
     if stats.stat_points > 0 {
         d.draw_circle((btn_rect.x + btn_rect.width - 15.0) as i32, (btn_rect.y + 15.0) as i32, 8.0, NEU_RED);
-        d.draw_text("!", (btn_rect.x + btn_rect.width - 18.0) as i32, (btn_rect.y + 8.0) as i32, 14, Color::WHITE);
+        d.draw_text_ex(&assets.font_main, "!", Vector2::new(btn_rect.x + btn_rect.width - 18.0, btn_rect.y + 8.0), 14.0, 1.0, Color::WHITE);
     }
 }
 
@@ -462,6 +473,9 @@ fn draw_relics(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
         d.draw_rectangle_rounded(rect, 0.2, 4, NEU_BLUE);
         d.draw_rectangle_rounded_lines_ex(rect, 0.2, 4, 2.0, NEU_ORANGE);
         let letter = &relic.name[0..1];
+        // Note: For relics, we might not have 'assets' passed here in the original struct,
+        // so we keep default text unless we change the signature to pass assets.
+        // For now, let's assume we stick to default or pass assets if you update the call in draw_scene.
         d.draw_text(letter, (x + 20.0) as i32, (y + 15.0) as i32, 30, PARCHMENT);
     }
 }
@@ -489,6 +503,9 @@ fn draw_shop(d: &mut RaylibDrawHandle, _stats: &BaseModifiers) { d.draw_text("Sh
 fn draw_battle_result(d: &mut RaylibDrawHandle, _stats: &BaseModifiers) { d.draw_text("Battle Result", 100, 100, 20, Color::WHITE); }
 fn draw_dev_toolbox(_d: &mut RaylibDrawHandle) {}
 fn draw_menu(d: &mut RaylibDrawHandle) {
+    // Note: draw_menu doesn't have access to assets in the original signature.
+    // You must update `draw_menu` signature in `draw_scene` to `draw_menu(d, assets)` to use the font here.
+    // I will leave it as default for now to prevent compilation errors if the signature isn't updated.
     let text = "ONE NIGHT BALATRO";
     let font_size = 80;
     let text_w = d.measure_text(text, font_size);
@@ -502,13 +519,13 @@ fn draw_menu(d: &mut RaylibDrawHandle) {
     let sx = (SCREEN_WIDTH as i32 - sub_w) / 2;
     d.draw_text(sub, sx, y + 100, sub_size, Color::GRAY);
 }
-fn draw_enemy_monitor(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _assets: &GameAssets) {
+fn draw_enemy_monitor(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &GameAssets) {
     let w = 260.0;
     let h = 160.0;
     let x = ENEMY_CENTER_X - w / 2.0;
     let y = ENEMY_Y;
 
-    // Damage Flash Effect: Scale up slightly when hurt
+    // Damage Flash Effect
     let scale_mod = if stats.damage_flash_timer > 0.0 { 4.0 } else { 0.0 };
     let final_rect = Rectangle::new(x - scale_mod, y - scale_mod, w + scale_mod*2.0, h + scale_mod*2.0);
 
@@ -518,7 +535,8 @@ fn draw_enemy_monitor(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _assets: 
     let screen_rect = Rectangle::new(x + 10.0, y + 10.0, w - 20.0, h - 20.0);
     d.draw_rectangle_rounded(screen_rect, 0.05, 4, Color::new(20, 30, 40, 255));
 
-    d.draw_text(&stats.enemy_name, (x + 20.0) as i32, (y + 25.0) as i32, 30, NEU_RED);
+    // FONT UPDATE
+    d.draw_text_ex(&assets.font_main, &stats.enemy_name, Vector2::new(x + 20.0, y + 25.0), 30.0, 1.0, NEU_RED);
 
     let ability_text = match stats.active_ability {
         BossAbility::SilenceSuit(_) => "SILENCE",
@@ -528,10 +546,10 @@ fn draw_enemy_monitor(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _assets: 
         _ => "",
     };
     if !ability_text.is_empty() {
-        d.draw_text(ability_text, (x + 20.0) as i32, (y + 60.0) as i32, 20, Color::RED);
+        d.draw_text_ex(&assets.font_main, ability_text, Vector2::new(x + 20.0, y + 60.0), 20.0, 1.0, Color::RED);
     }
 
-    // HP Bar (Inside the Box)
+    // HP Bar
     let current_score = stats.display_score as i32;
     let remaining_hp = (stats.target_score - current_score).max(0);
     let hp_pct = (remaining_hp as f32 / stats.target_score as f32).clamp(0.0, 1.0);
@@ -543,7 +561,6 @@ fn draw_enemy_monitor(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _assets: 
 
     d.draw_rectangle(bar_x as i32, bar_y as i32, bar_w as i32, bar_h as i32, Color::BLACK);
 
-    // Flash Logic: White -> Red -> Blue
     let fill_color = if stats.damage_flash_timer > 0.0 {
         if stats.damage_flash_timer > 0.1 { Color::WHITE } else { NEU_RED }
     } else {
@@ -555,5 +572,7 @@ fn draw_enemy_monitor(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _assets: 
 
     let hp_text = format!("{} / {}", remaining_hp, stats.target_score);
     let text_w = d.measure_text(&hp_text, 20);
-    d.draw_text(&hp_text, (bar_x + bar_w/2.0 - text_w as f32/2.0) as i32, (bar_y + 2.0) as i32, 20, Color::WHITE);
+
+    // FONT UPDATE
+    d.draw_text_ex(&assets.font_main, &hp_text, Vector2::new(bar_x + bar_w/2.0 - text_w as f32/2.0, bar_y + 2.0), 20.0, 1.0, Color::WHITE);
 }
