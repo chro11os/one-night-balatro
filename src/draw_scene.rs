@@ -23,17 +23,11 @@ pub fn draw_scene(d: &mut RaylibDrawHandle, stats: &BaseModifiers, hand: &[Card]
                 let mut d_cam = d.begin_mode2D(camera);
                 draw_enemy_monitor(&mut d_cam, stats, assets);
                 draw_player_panel(&mut d_cam, stats, assets);
-
-                // Pass 'hand' to check selection count limits
                 draw_action_panel(&mut d_cam, stats, anim, assets, hand);
-
                 draw_sort_buttons(&mut d_cam, assets);
                 draw_relics(&mut d_cam, stats);
-
-                // Draw cards with Z-ordering (Active cards on top)
                 draw_game_area(&mut d_cam, hand, assets, stats);
 
-                // Draw Floating Text (VFX)
                 for ft in &stats.floating_texts {
                     let alpha = (ft.life / ft.max_life).clamp(0.0, 1.0);
                     let color = ft.color.alpha(alpha);
@@ -41,7 +35,6 @@ pub fn draw_scene(d: &mut RaylibDrawHandle, stats: &BaseModifiers, hand: &[Card]
                     d_cam.draw_text(&ft.text, ft.pos.x as i32, ft.pos.y as i32, ft.size, color);
                 }
 
-                // Draw Particles (VFX)
                 for p in &stats.particles {
                     let alpha = (p.life / p.max_life).clamp(0.0, 1.0);
                     let color = p.color.alpha(alpha);
@@ -53,7 +46,8 @@ pub fn draw_scene(d: &mut RaylibDrawHandle, stats: &BaseModifiers, hand: &[Card]
         },
         GameState::RuneSelect => {
             d.clear_background(NEU_BG);
-            draw_rune_select(d, stats);
+            // FIX: Pass assets to draw_rune_select
+            draw_rune_select(d, stats, assets);
         },
         GameState::Shop => {
             draw_shop(d, stats);
@@ -192,7 +186,7 @@ fn draw_player_panel(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _assets: &
     }
 }
 
-fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
+fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &GameAssets) {
     let center_x = SCREEN_WIDTH / 2.0;
     let content_offset = RUNE_CONTENT_OFFSET;
     let start_y_base = RUNE_START_Y;
@@ -231,19 +225,35 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
             let is_equipped = stats.equipped_runes.iter().any(|r| r.id == rune.id);
             let is_hovered = ((mouse_pos.x - cx).powi(2) + (mouse_pos.y - cy).powi(2)).sqrt() < radius;
 
+            // 1. Draw Selection Halo
             if is_equipped {
-                d.draw_circle(cx as i32, cy as i32, radius, *color);
                 d.draw_circle_lines(cx as i32, cy as i32, radius + 4.0, NEU_ORANGE);
+                d.draw_circle(cx as i32, cy as i32, radius + 2.0, color.alpha(0.2));
+            } else if is_hovered {
+                d.draw_circle_lines(cx as i32, cy as i32, radius + 2.0, Color::WHITE);
             } else {
-                d.draw_circle(cx as i32, cy as i32, radius, color.alpha(0.2));
-                d.draw_circle_lines(cx as i32, cy as i32, radius, *color);
+                d.draw_circle_lines(cx as i32, cy as i32, radius, color.alpha(0.5));
             }
 
-            let letter = &rune.name[0..1];
-            d.draw_text(letter, (cx - 10.0) as i32, (cy - 15.0) as i32, 30, PARCHMENT);
+            // 2. Draw Icon (if available) OR Fallback Letter
+            if let Some(tex) = assets.rune_icons.get(&rune.name) {
+                // Scale texture to fit inside radius (64x64 roughly)
+                let icon_size = radius * 2.0;
+                let dest_rect = Rectangle::new(cx - radius, cy - radius, icon_size, icon_size);
+                let src_rect = Rectangle::new(0.0, 0.0, tex.width as f32, tex.height as f32);
+
+                // Tint gray if not selected/hovered
+                let tint = if is_equipped || is_hovered { Color::WHITE } else { Color::GRAY };
+
+                d.draw_texture_pro(tex, src_rect, dest_rect, Vector2::zero(), 0.0, tint);
+            } else {
+                // Fallback: Circle Background + Letter
+                d.draw_circle(cx as i32, cy as i32, radius, color.alpha(0.2));
+                let letter = &rune.name[0..1];
+                d.draw_text(letter, (cx - 10.0) as i32, (cy - 15.0) as i32, 30, PARCHMENT);
+            }
 
             if is_hovered {
-                d.draw_circle_lines(cx as i32, cy as i32, radius + 2.0, Color::WHITE);
                 hovered_rune_name = rune.name.clone();
                 hovered_rune_desc = rune.description.clone();
                 hovered_rune_color = *color;
@@ -493,14 +503,22 @@ fn draw_menu(d: &mut RaylibDrawHandle) {
     d.draw_text(sub, sx, y + 100, sub_size, Color::GRAY);
 }
 fn draw_enemy_monitor(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _assets: &GameAssets) {
-    let w = 350.0;
-    let h = 220.0;
+    let w = 260.0;
+    let h = 160.0;
     let x = ENEMY_CENTER_X - w / 2.0;
     let y = ENEMY_Y;
-    d.draw_rectangle_rounded(Rectangle::new(x, y, w, h), 0.1, 4, Color::BLACK);
-    d.draw_rectangle_rounded_lines_ex(Rectangle::new(x, y, w, h), 0.1, 4, 6.0, Color::DARKGRAY);
-    d.draw_rectangle_rounded(Rectangle::new(x + 10.0, y + 10.0, w - 20.0, h - 40.0), 0.05, 4, Color::new(20, 30, 40, 255));
-    d.draw_text(&stats.enemy_name, (x + 20.0) as i32, (y + 30.0) as i32, 36, NEU_RED);
+
+    // Damage Flash Effect: Scale up slightly when hurt
+    let scale_mod = if stats.damage_flash_timer > 0.0 { 4.0 } else { 0.0 };
+    let final_rect = Rectangle::new(x - scale_mod, y - scale_mod, w + scale_mod*2.0, h + scale_mod*2.0);
+
+    d.draw_rectangle_rounded(final_rect, 0.1, 4, Color::BLACK);
+    d.draw_rectangle_rounded_lines_ex(final_rect, 0.1, 4, 6.0, Color::DARKGRAY);
+
+    let screen_rect = Rectangle::new(x + 10.0, y + 10.0, w - 20.0, h - 20.0);
+    d.draw_rectangle_rounded(screen_rect, 0.05, 4, Color::new(20, 30, 40, 255));
+
+    d.draw_text(&stats.enemy_name, (x + 20.0) as i32, (y + 25.0) as i32, 30, NEU_RED);
 
     let ability_text = match stats.active_ability {
         BossAbility::SilenceSuit(_) => "SILENCE",
@@ -510,14 +528,32 @@ fn draw_enemy_monitor(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _assets: 
         _ => "",
     };
     if !ability_text.is_empty() {
-        d.draw_text(ability_text, (x + 20.0) as i32, (y + 80.0) as i32, 24, Color::RED);
+        d.draw_text(ability_text, (x + 20.0) as i32, (y + 60.0) as i32, 20, Color::RED);
     }
-    let bar_w = w;
+
+    // HP Bar (Inside the Box)
+    let current_score = stats.display_score as i32;
+    let remaining_hp = (stats.target_score - current_score).max(0);
+    let hp_pct = (remaining_hp as f32 / stats.target_score as f32).clamp(0.0, 1.0);
+
+    let bar_w = w - 40.0;
     let bar_h = 24.0;
-    let bar_y = y + h + 15.0;
-    d.draw_rectangle(x as i32, bar_y as i32, bar_w as i32, bar_h as i32, Color::BLACK);
-    let hp_pct = (stats.display_score / stats.target_score as f32).clamp(0.0, 1.0);
-    d.draw_rectangle(x as i32, bar_y as i32, (bar_w * hp_pct) as i32, bar_h as i32, NEU_BLUE);
-    d.draw_rectangle_lines(x as i32, bar_y as i32, bar_w as i32, bar_h as i32, Color::GRAY);
-    d.draw_text(&format!("{:.0} / {}", stats.display_score, stats.target_score), (x + 5.0) as i32, (bar_y - 30.0) as i32, 24, Color::WHITE);
+    let bar_x = x + 20.0;
+    let bar_y = y + h - 45.0;
+
+    d.draw_rectangle(bar_x as i32, bar_y as i32, bar_w as i32, bar_h as i32, Color::BLACK);
+
+    // Flash Logic: White -> Red -> Blue
+    let fill_color = if stats.damage_flash_timer > 0.0 {
+        if stats.damage_flash_timer > 0.1 { Color::WHITE } else { NEU_RED }
+    } else {
+        NEU_BLUE
+    };
+
+    d.draw_rectangle(bar_x as i32, bar_y as i32, (bar_w * hp_pct) as i32, bar_h as i32, fill_color);
+    d.draw_rectangle_lines(bar_x as i32, bar_y as i32, bar_w as i32, bar_h as i32, Color::GRAY);
+
+    let hp_text = format!("{} / {}", remaining_hp, stats.target_score);
+    let text_w = d.measure_text(&hp_text, 20);
+    d.draw_text(&hp_text, (bar_x + bar_w/2.0 - text_w as f32/2.0) as i32, (bar_y + 2.0) as i32, 20, Color::WHITE);
 }

@@ -88,11 +88,8 @@ pub struct BaseModifiers {
     pub equipped_relics: Vec<RelicData>,
     pub enemy_database: Option<EnemyData>,
     pub relic_database: Vec<RelicData>,
-
-    // VFX Fields
     pub floating_texts: Vec<FloatingText>,
     pub particles: Vec<Particle>,
-
     pub previous_state: GameState,
     pub current_sort: SortMode,
     pub screen_shake: Vector2,
@@ -103,6 +100,9 @@ pub struct BaseModifiers {
     pub score_delay: f32,
     pub shop_price_mult: f32,
     pub ante_scaling: f32,
+
+    // NEW: Flash timer for enemy damage animation
+    pub damage_flash_timer: f32,
 }
 
 impl Default for BaseModifiers {
@@ -115,21 +115,25 @@ impl Default for BaseModifiers {
             enemy_name: "Giant Rat".to_string(), enemy_damage: 10, active_ability: BossAbility::None,
             equipped_runes: Vec::new(), available_runes: Vec::new(), equipped_relics: Vec::new(),
             enemy_database: None, relic_database: Vec::new(),
-
-            // Init empty VFX lists
-            floating_texts: Vec::new(),
-            particles: Vec::new(),
-
+            floating_texts: Vec::new(), particles: Vec::new(),
             previous_state: GameState::Menu, current_sort: SortMode::Rank,
             screen_shake: Vector2::zero(), shake_timer: 0.0,
             is_crit_active: false, score_index: 0, score_timer: 0.0, score_delay: 0.0,
             shop_price_mult: 1.0, ante_scaling: 1.5,
+
+            // Init new field
+            damage_flash_timer: 0.0,
         }
     }
 }
 
 impl BaseModifiers {
     pub fn update_vfx(&mut self, dt: f32) {
+        // Update Damage Flash
+        if self.damage_flash_timer > 0.0 {
+            self.damage_flash_timer -= dt;
+        }
+
         // Update Floating Text
         self.floating_texts.retain_mut(|ft| {
             ft.life -= dt;
