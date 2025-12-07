@@ -16,11 +16,11 @@ mod tests {
 
         // Simulate a Two Pair hand: e.g., Two Kings, Two Queens
         let mut played_cards_for_test = vec![
-            Card::new(0, 0.0, 0.0), // Placeholder
-            Card::new(1, 0.0, 0.0), // Placeholder
-            Card::new(2, 0.0, 0.0), // Placeholder
-            Card::new(3, 0.0, 0.0), // Placeholder
-            Card::new(4, 0.0, 0.0), // Placeholder
+            Card::new(0, 0.0), // Placeholder
+            Card::new(1, 0.0), // Placeholder
+            Card::new(2, 0.0), // Placeholder
+            Card::new(3, 0.0), // Placeholder
+            Card::new(4, 0.0), // Placeholder
         ];
         
         // Manually set card values for the test

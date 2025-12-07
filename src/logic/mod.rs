@@ -4,6 +4,7 @@ pub mod menu;
 pub mod rune_select;
 pub mod stats_menu;
 pub mod battle_result;
+pub mod metrics;
 
 pub use game::update_game;
 pub use shop::update_shop;

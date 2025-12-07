@@ -39,7 +39,7 @@ fn main() {
         let mut id_counter = 0;
         for suit in 0..4 {
             for val in 2..15 {
-                let mut card = Card::new(id_counter, DECK_X, DECK_Y);
+                let mut card = Card::new(id_counter, DECK_X);
                 card.suit = suit;
                 card.value = val;
                 all_cards.push(card);
@@ -53,7 +53,6 @@ fn main() {
         let mut hand = Vec::with_capacity(6);
         for _ in 0..hand_size {
             if let Some(mut card) = all_cards.pop() {
-                card.target_pos.y = HAND_Y_POS;
                 hand.push(card);
             }
         }
@@ -66,7 +65,7 @@ fn main() {
     while !rl.window_should_close() && current_state != GameState::Exit {
         let frame_start = bench.start_frame();
         let dt = rl.get_frame_time();
-        let total_time = rl.get_time() as f32;
+        let _total_time = rl.get_time() as f32;
         let update_start = Instant::now();
 
         match current_state {

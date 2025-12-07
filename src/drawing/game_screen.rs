@@ -8,8 +8,26 @@ use crate::drawing::ui_elements::get_button_offset;
 
 
 pub fn draw_game_area(d: &mut RaylibDrawHandle, hand: &[Card], assets: &GameAssets, _stats: &BaseModifiers) {
-    // Draw cards in index order as there's no complex motion or Z-sorting needed.
-    for card in hand.iter() {
+    // 1. Create a list of references
+    let mut draw_order: Vec<&Card> = hand.iter().collect();
+
+    // 2. Sort: Idle cards (0) first, Moving/Hovered/Selected cards (1) last
+    draw_order.sort_by_key(|c| {
+        if c.tween.is_some() || c.is_selected || c.is_hovered {
+            1
+        } else {
+            0
+        }
+    });
+
+    println!("Drawing {} cards...", draw_order.len()); // DEBUG CHECK 1
+
+    for (i, card) in draw_order.iter().enumerate() {
+        // DEBUG CHECK 2: Print first card details
+        if i == 0 {
+            println!("Card[0]: Pos: {:?}, Scale: {:?}, Tween Active: {}", 
+                card.current_pos, card.scale, card.tween.is_some());
+        }
         draw_single_card(d, card, assets);
     }
 }
@@ -154,6 +172,19 @@ pub fn draw_relics(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &Gam
 }
 
 pub fn draw_single_card(d: &mut RaylibDrawHandle, card: &Card, assets: &GameAssets) {
+    // 1. Draw a massive debug crosshair at 0,0 to see if camera is centered
+    d.draw_line(0, 0, 1000, 1000, Color::GREEN);
+
+    // 2. DEBUG: Draw a Red Box at the card's position (Fallback)
+    let debug_rect = Rectangle::new(
+        card.current_pos.x, 
+        card.current_pos.y, 
+        CARD_WIDTH * card.scale.x, 
+        CARD_HEIGHT * card.scale.y
+    );
+    d.draw_rectangle_rec(debug_rect, Color::RED); // <--- LOOK FOR THIS
+
+    // 3. Normal Texture Drawing
     const SHEET_W: f32 = 5928.0;
     const SHEET_H: f32 = 2848.0;
     const COLS: f32 = 13.0;
@@ -163,12 +194,17 @@ pub fn draw_single_card(d: &mut RaylibDrawHandle, card: &Card, assets: &GameAsse
 
     let col_idx = if card.value == 14 { 0 } else { card.value - 1 };
     let row_idx = match card.suit { 0 => 0, 1 => 1, 2 => 3, 3 => 2, _ => 0 };
+    
+    // DEBUG PRINT
+    if card.value == 14 && card.suit == 0 { // Print only once for Ace of Spades
+         println!("Src Rect: x={} y={} w={} h={}", col_idx as f32 * src_w, row_idx as f32 * src_h, src_w, src_h);
+    }
+
     let source_rec = Rectangle::new(col_idx as f32 * src_w, row_idx as f32 * src_h, src_w, src_h);
-    let dest_width = CARD_WIDTH * card.scale.x;
-    let dest_height = CARD_HEIGHT * card.scale.y;
-    let dest_rect = Rectangle::new(card.current_pos.x, card.current_pos.y, dest_width, dest_height);
-    let origin = Vector2::new(dest_width / 2.0, dest_height / 2.0);
+    let dest_rect = Rectangle::new(card.current_pos.x, card.current_pos.y, CARD_WIDTH * card.scale.x, CARD_HEIGHT * card.scale.y);
+    let origin = Vector2::new(dest_rect.width / 2.0, dest_rect.height / 2.0); // CORRECTED LINE
     let tint = if card.is_hovered { Color::WHITE } else { Color::new(245, 245, 245, 255) };
+    
     d.draw_texture_pro(&assets.tex_spritesheet, source_rec, dest_rect, origin, card.rotation * 57.29, tint);
 }
 

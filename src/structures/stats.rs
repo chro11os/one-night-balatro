@@ -4,6 +4,7 @@ use crate::structures::state::GameState;
 use crate::structures::hand::HandRank;
 use crate::structures::data_loader::{EnemyData, RelicData};
 use rand::{self, Rng};
+use crate::logic::metrics::GameMetrics; // Import GameMetrics
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum RuneType {
@@ -131,6 +132,7 @@ pub struct BaseModifiers {
     pub damage_flash_timer: f32,
     pub window_y_offset: f32,
     pub input_consumed: bool,
+    pub game_metrics: GameMetrics,
 }
 
 impl Default for BaseModifiers {
@@ -175,6 +177,7 @@ impl Default for BaseModifiers {
             damage_flash_timer: 0.0,
             window_y_offset: 0.0,
             input_consumed: false,
+            game_metrics: GameMetrics::new(),
         }
     }
 }
