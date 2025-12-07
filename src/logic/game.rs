@@ -200,7 +200,7 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
                 if card.is_selected {
                     let start_pos = card.current_pos;
                     let end_pos = Vector2::new(start_x + (idx as f32 * spacing), PLAY_AREA_Y);
-                    let control_point = Vector2::new((start_pos.x + end_pos.x) / 2.0, (start_pos.y + end_pos.y) / 2.0 - 100.0);
+                    let control_point = Vector2::new((start_pos.x + end_pos.x) / 2.0, (start_pos.y + end_pos.y) / 2.0 - 150.0);
                     
                     card.set_target_pos_bezier_tweened(end_pos, control_point, animation_duration);
                     card.set_target_scale_rotation_tweened(Vector2::new(1.1, 1.1), 0.0, animation_duration); // Slightly larger and no rotation

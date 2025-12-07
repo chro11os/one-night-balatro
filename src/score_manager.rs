@@ -1,78 +1,78 @@
 
 use crate::structures::stats::{BaseModifiers};
-use crate::structures::data_loader::RelicData;
 use crate::structures::card::Card;
 use crate::structures::relic::{Relic, GameRelic, ScoringContext, RelicEffect};
-use crate::poker; // Assuming poker functions are public
+use crate::poker;
 use crate::structures::hand::HandRank;
 
-pub struct ScoreManager; // Simple struct to hold associated functions
+#[derive(Debug, Default)]
+pub struct ScoreResult {
+    pub chips: i32,
+    pub mult: i32,
+}
+
+pub struct ScoreManager;
 
 impl ScoreManager {
-    pub fn calculate_hand_score(
-        stats: &mut BaseModifiers,
-        played_cards: &[Card],
-        held_cards: &[Card],
-        hand_rank: HandRank,
-        all_relics: &[RelicData], // Pass all relics for context
-    ) {
-        // Step A: Determine Base Chips and Base Mult from the Poker Hand
-        let (mut current_chips, mut current_mult) = poker::get_hand_base_score(hand_rank);
+    pub fn calculate_hand(played_cards: &[Card], held_cards: &[Card], relics: &[GameRelic], poker_hand: HandRank, stats_snapshot: &BaseModifiers) -> ScoreResult {
+        let (current_chips, current_mult) = poker::get_hand_base_score(poker_hand);
+
+        let mut score_result = ScoreResult {
+            chips: current_chips,
+            mult: current_mult,
+        };
 
         // Create a scoring context for relics to read from
-        let context = ScoringContext {
-            current_chips,
-            current_mult,
-            current_score: 0, // Will be updated later if needed by a relic
+        let mut context = ScoringContext {
+            current_chips: score_result.chips,
+            current_mult: score_result.mult,
+            current_score: 0,
             base_chips: current_chips,
             base_mult: current_mult,
             played_cards,
             held_cards,
             all_cards_in_play: played_cards, // Assuming only played cards are "in play" for most relics
-            hand_rank: Some(hand_rank),
-            stats_snapshot: stats, // Pass a snapshot of the current stats
+            hand_rank: Some(poker_hand),
+            stats_snapshot, // Pass a snapshot of the current stats
         };
 
-        // Step B: Iterate through "Played Cards" (triggering card enhancements and specific card-relics)
-        // This would involve applying effects from individual cards (e.g., enhancements)
-        // For now, we'll simulate a simple played card effect via relic trait.
+        // Step 2: Card Loop (Played Cards) - Trigger OnPlayedCardScored effects
         for card in played_cards {
-            for relic_data in all_relics {
-                let game_relic = GameRelic { data: relic_data.clone() };
-                match game_relic.on_played_card_scored(&context, card) {
-                    RelicEffect::AddMult(val) => current_mult += val,
-                    RelicEffect::XMult(val) => current_mult = (current_mult as f32 * val) as i32,
-                    RelicEffect::AddChips(val) => current_chips += val,
+            for relic in relics {
+                match relic.on_played_card_scored(&context, card) {
+                    RelicEffect::AddMult(val) => score_result.mult += val,
+                    RelicEffect::XMult(val) => score_result.mult = (score_result.mult as f32 * val) as i32,
+                    RelicEffect::AddChips(val) => score_result.chips += val,
                     RelicEffect::None => {}
                 }
             }
         }
 
-
-        // Step C: Iterate through "Held Cards" (for steel cards or specific holding effects)
-        // Similar to played cards, relics can react to held cards.
+        // Step 3: Held Loop (Held Cards) - Trigger OnHeldCard effects (if any, not explicitly defined yet)
+        // For example, if a "Steel Card" relic exists, it could apply an effect here
+        // This is largely handled by relics implementing on_held_card_effect (not yet in trait)
         for _card in held_cards {
-            // For example, if a "Steel Card" relic exists, it could apply an effect here
-            // This is largely handled by relics implementing on_held_card_effect (not yet in trait)
-        }
-
-        // Step D: Iterate through the Relic vector (Left-to-Right) applying their effects to the running total
-        for relic_data in all_relics {
-            let game_relic = GameRelic { data: relic_data.clone() };
-            match game_relic.on_hand_scored(&context) {
-                RelicEffect::AddMult(val) => current_mult += val,
-                RelicEffect::XMult(val) => current_mult = (current_mult as f32 * val) as i32,
-                RelicEffect::AddChips(val) => current_chips += val,
-                RelicEffect::None => {}
+            for _relic in relics {
+                // Example: if a relic has an effect for held cards, apply it here
+                // match relic.on_held_card_scored(&context, card) { ... }
             }
         }
 
-        // Apply calculated chips and mult to global stats
-        stats.chips += current_chips;
-        stats.mult += current_mult;
 
-        // Update total score
-        stats.total_score += stats.chips * stats.mult;
-        stats.round_score += stats.chips * stats.mult;
+        // Step 4: Relic Loop - Apply RelicTrigger::Passive or Global effects (on_hand_scored)
+        for relic in relics {
+            match relic.on_hand_scored(&context) {
+                RelicEffect::AddMult(val) => score_result.mult += val,
+                RelicEffect::XMult(val) => score_result.mult = (score_result.mult as f32 * val) as i32,
+                RelicEffect::AddChips(val) => score_result.chips += val,
+                RelicEffect::None => {}
+            }
+        }
+        
+        // Final score calculation
+        score_result.chips = score_result.chips.max(0); // Chips can't go below 0
+        score_result.mult = score_result.mult.max(0); // Mult can't go below 0
+
+        score_result
     }
 }

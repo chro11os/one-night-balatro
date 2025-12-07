@@ -8,12 +8,23 @@ use crate::drawing::ui_elements::get_button_offset;
 
 
 pub fn draw_game_area(d: &mut RaylibDrawHandle, hand: &[Card], assets: &GameAssets, _stats: &BaseModifiers) {
-    // 1. Draw cards that are not active (idle) first (Bottom Layer)
-    for card in hand.iter().filter(|c| !c.is_moving() && !c.is_hovered && !c.is_selected) {
-        draw_single_card(d, card, assets);
-    }
-    // 2. Draw cards that are active (moving, hovered, or selected) last (Top Layer)
-    for card in hand.iter().filter(|c| c.is_moving() || c.is_hovered || c.is_selected) {
+    let mut cards_to_draw: Vec<&Card> = hand.iter().collect();
+
+    // Sort cards for drawing order: Moving and Hovered cards last (drawn on top)
+    cards_to_draw.sort_by(|a, b| {
+        let a_is_active = a.is_moving() || a.is_hovered || a.is_selected;
+        let b_is_active = b.is_moving() || b.is_hovered || b.is_selected;
+
+        if a_is_active && !b_is_active {
+            std::cmp::Ordering::Greater // 'a' is active, 'b' is not, 'a' comes after 'b'
+        } else if !a_is_active && b_is_active {
+            std::cmp::Ordering::Less    // 'a' is not active, 'b' is, 'a' comes before 'b'
+        } else {
+            std::cmp::Ordering::Equal   // Both are active or both are inactive, maintain original order
+        }
+    });
+
+    for card in cards_to_draw.into_iter() {
         draw_single_card(d, card, assets);
     }
 }
