@@ -5,6 +5,7 @@ use crate::structures::assets::GameAssets;
 use crate::structures::state::{GameState, AnimationState};
 use crate::consts::*;
 
+
 pub fn draw_scene(d: &mut RaylibDrawHandle, stats: &BaseModifiers, hand: &[Card], state: &GameState, assets: &GameAssets, anim: &AnimationState) {
     let camera = Camera2D {
         target: Vector2::new(0.0, 0.0),
@@ -25,14 +26,17 @@ pub fn draw_scene(d: &mut RaylibDrawHandle, stats: &BaseModifiers, hand: &[Card]
                 draw_player_panel(&mut d_cam, stats, assets);
                 draw_action_panel(&mut d_cam, stats, anim, assets, hand);
                 draw_sort_buttons(&mut d_cam, assets);
-                draw_relics(&mut d_cam, stats);
+                draw_relics(&mut d_cam, stats, assets);
                 draw_game_area(&mut d_cam, hand, assets, stats);
 
+                // FIX: Scoring Popups now use Custom Font
                 for ft in &stats.floating_texts {
                     let alpha = (ft.life / ft.max_life).clamp(0.0, 1.0);
                     let color = ft.color.alpha(alpha);
-                    d_cam.draw_text(&ft.text, (ft.pos.x + 2.0) as i32, (ft.pos.y + 2.0) as i32, ft.size, Color::BLACK.alpha(alpha));
-                    d_cam.draw_text(&ft.text, ft.pos.x as i32, ft.pos.y as i32, ft.size, color);
+                    // Shadow
+                    d_cam.draw_text_ex(&assets.font_main, &ft.text, Vector2::new(ft.pos.x + 2.0, ft.pos.y + 2.0), ft.size as f32, 1.0, Color::BLACK.alpha(alpha));
+                    // Main Text
+                    d_cam.draw_text_ex(&assets.font_main, &ft.text, Vector2::new(ft.pos.x, ft.pos.y), ft.size as f32, 1.0, color);
                 }
 
                 for p in &stats.particles {
@@ -46,11 +50,10 @@ pub fn draw_scene(d: &mut RaylibDrawHandle, stats: &BaseModifiers, hand: &[Card]
         },
         GameState::RuneSelect => {
             d.clear_background(NEU_BG);
-            // FIX: Pass assets to draw_rune_select
             draw_rune_select(d, stats, assets);
         },
         GameState::Shop => {
-            draw_shop(d, stats);
+            draw_shop(d, stats, assets);
         },
         GameState::StatsMenu => {
             {
@@ -58,15 +61,15 @@ pub fn draw_scene(d: &mut RaylibDrawHandle, stats: &BaseModifiers, hand: &[Card]
                 draw_player_panel(&mut d_cam, stats, assets);
             }
             d.draw_rectangle(0, 0, SCREEN_WIDTH as i32, SCREEN_HEIGHT as i32, NEU_BLACK.alpha(0.85));
-            draw_stats_menu(d, stats);
+            draw_stats_menu(d, stats, assets);
         },
         GameState::BattleResult => {
             d.clear_background(NEU_BLACK);
-            draw_battle_result(d, stats);
+            draw_battle_result(d, stats, assets);
         },
         GameState::Menu => {
             d.clear_background(NEU_BG);
-            draw_menu(d);
+            draw_menu(d, assets); // Assuming you want main menu to use it too if not already
         },
         _ => d.clear_background(NEU_BG),
     }
@@ -202,8 +205,9 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &Ga
     let content_offset = RUNE_CONTENT_OFFSET;
     let start_y_base = RUNE_START_Y;
 
-    d.draw_text("CHOOSE YOUR PATH", (center_x + content_offset - 200.0) as i32, 50, 60, NEU_ORANGE);
-    d.draw_text("Select one rune from each row.", (center_x + content_offset - 220.0) as i32, 120, 24, Color::GRAY);
+    // FIX: Use Custom Font
+    d.draw_text_ex(&assets.font_main, "CHOOSE YOUR PATH", Vector2::new(center_x + content_offset - 200.0, 50.0), 60.0, 1.0, NEU_ORANGE);
+    d.draw_text_ex(&assets.font_main, "Select one rune from each row.", Vector2::new(center_x + content_offset - 220.0, 120.0), 24.0, 1.0, Color::GRAY);
 
     let rows = [
         (RuneType::Red, "COMBAT STYLE", NEU_RED, start_y_base),
@@ -218,7 +222,7 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &Ga
     let mut hovered_rune_color = Color::WHITE;
 
     for (r_type, label, color, y_pos) in rows.iter() {
-        d.draw_text(label, 50, (*y_pos - 10.0) as i32, 20, *color);
+        d.draw_text_ex(&assets.font_main, label, Vector2::new(50.0, *y_pos - 10.0), 20.0, 1.0, *color);
 
         let row_runes: Vec<_> = stats.available_runes.iter().filter(|r| r.rune_type == *r_type).collect();
         let count = row_runes.len();
@@ -236,7 +240,6 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &Ga
             let is_equipped = stats.equipped_runes.iter().any(|r| r.id == rune.id);
             let is_hovered = ((mouse_pos.x - cx).powi(2) + (mouse_pos.y - cy).powi(2)).sqrt() < radius;
 
-            // 1. Draw Selection Halo
             if is_equipped {
                 d.draw_circle_lines(cx as i32, cy as i32, radius + 4.0, NEU_ORANGE);
                 d.draw_circle(cx as i32, cy as i32, radius + 2.0, color.alpha(0.2));
@@ -246,22 +249,17 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &Ga
                 d.draw_circle_lines(cx as i32, cy as i32, radius, color.alpha(0.5));
             }
 
-            // 2. Draw Icon (if available) OR Fallback Letter
             if let Some(tex) = assets.rune_icons.get(&rune.name) {
-                // Scale texture to fit inside radius (64x64 roughly)
                 let icon_size = radius * 2.0;
                 let dest_rect = Rectangle::new(cx - radius, cy - radius, icon_size, icon_size);
                 let src_rect = Rectangle::new(0.0, 0.0, tex.width as f32, tex.height as f32);
-
-                // Tint gray if not selected/hovered
                 let tint = if is_equipped || is_hovered { Color::WHITE } else { Color::GRAY };
-
                 d.draw_texture_pro(tex, src_rect, dest_rect, Vector2::zero(), 0.0, tint);
             } else {
-                // Fallback: Circle Background + Letter
                 d.draw_circle(cx as i32, cy as i32, radius, color.alpha(0.2));
                 let letter = &rune.name[0..1];
-                d.draw_text(letter, (cx - 10.0) as i32, (cy - 15.0) as i32, 30, PARCHMENT);
+                // FIX: Use Custom Font for rune letter
+                d.draw_text_ex(&assets.font_main, letter, Vector2::new(cx - 10.0, cy - 15.0), 30.0, 1.0, PARCHMENT);
             }
 
             if is_hovered {
@@ -281,11 +279,11 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &Ga
         d.draw_rectangle_rounded(Rectangle::new(info_x, info_y, info_w, info_h), 0.1, 4, NEU_BLACK.alpha(0.9));
         d.draw_rectangle_rounded_lines_ex(Rectangle::new(info_x, info_y, info_w, info_h), 0.1, 4, 2.0, hovered_rune_color);
 
-        d.draw_text(&hovered_rune_name, (info_x + 20.0) as i32, (info_y + 20.0) as i32, 30, hovered_rune_color);
-        d.draw_text("Effect:", (info_x + 20.0) as i32, (info_y + 60.0) as i32, 20, Color::GRAY);
+        d.draw_text_ex(&assets.font_main, &hovered_rune_name, Vector2::new(info_x + 20.0, info_y + 20.0), 30.0, 1.0, hovered_rune_color);
+        d.draw_text_ex(&assets.font_main, "Effect:", Vector2::new(info_x + 20.0, info_y + 60.0), 20.0, 1.0, Color::GRAY);
 
         let max_text_width = info_w - 40.0;
-        let font_size = 20;
+        let font_size = 20.0; // Float for text_ex
         let mut current_y = info_y + 90.0;
 
         for paragraph in hovered_rune_desc.split('\n') {
@@ -294,8 +292,9 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &Ga
 
             for word in words {
                 let test_line = if current_line.is_empty() { word.to_string() } else { format!("{} {}", current_line, word) };
-                if d.measure_text(&test_line, font_size) as f32 > max_text_width {
-                    d.draw_text(&current_line, (info_x + 20.0) as i32, current_y as i32, font_size, PARCHMENT);
+                // FIX: Measure text using custom font
+                if assets.font_main.measure_text(&test_line, font_size, 1.0).x > max_text_width {
+                    d.draw_text_ex(&assets.font_main, &current_line, Vector2::new(info_x + 20.0, current_y), font_size, 1.0, PARCHMENT);
                     current_line = word.to_string();
                     current_y += 24.0;
                 } else {
@@ -303,7 +302,7 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &Ga
                 }
             }
             if !current_line.is_empty() {
-                d.draw_text(&current_line, (info_x + 20.0) as i32, current_y as i32, font_size, PARCHMENT);
+                d.draw_text_ex(&assets.font_main, &current_line, Vector2::new(info_x + 20.0, current_y), font_size, 1.0, PARCHMENT);
                 current_y += 24.0;
             }
         }
@@ -316,7 +315,7 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &Ga
     d.draw_rectangle_rounded(Rectangle::new(panel_x, 100.0, panel_w, panel_h), 0.05, 4, NEU_BLACK.alpha(0.8));
     d.draw_rectangle_rounded_lines_ex(Rectangle::new(panel_x, 100.0, panel_w, panel_h), 0.05, 4, 2.0, NEU_ORANGE);
 
-    d.draw_text("CURRENT LOADOUT", (panel_x + 80.0) as i32, 120, 24, PARCHMENT);
+    d.draw_text_ex(&assets.font_main, "CURRENT LOADOUT", Vector2::new(panel_x + 80.0, 120.0), 24.0, 1.0, PARCHMENT);
 
     let mut benefits: Vec<String> = Vec::new();
     let mut downsides: Vec<String> = Vec::new();
@@ -369,19 +368,19 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &Ga
 
     let mut list_y = 170.0;
 
-    d.draw_text("BENEFITS", (panel_x + 20.0) as i32, list_y as i32, 20, Color::GRAY);
+    d.draw_text_ex(&assets.font_main, "BENEFITS", Vector2::new(panel_x + 20.0, list_y), 20.0, 1.0, Color::GRAY);
     list_y += 30.0;
     for text in benefits {
-        d.draw_text(&text, (panel_x + 30.0) as i32, list_y as i32, 20, NEU_GREEN);
+        d.draw_text_ex(&assets.font_main, &text, Vector2::new(panel_x + 30.0, list_y), 20.0, 1.0, NEU_GREEN);
         list_y += 30.0;
     }
 
     list_y += 20.0;
 
-    d.draw_text("TRADE-OFFS", (panel_x + 20.0) as i32, list_y as i32, 20, Color::GRAY);
+    d.draw_text_ex(&assets.font_main, "TRADE-OFFS", Vector2::new(panel_x + 20.0, list_y), 20.0, 1.0, Color::GRAY);
     list_y += 30.0;
     for text in downsides {
-        d.draw_text(&text, (panel_x + 30.0) as i32, list_y as i32, 20, NEU_RED);
+        d.draw_text_ex(&assets.font_main, &text, Vector2::new(panel_x + 30.0, list_y), 20.0, 1.0, NEU_RED);
         list_y += 30.0;
     }
 
@@ -394,10 +393,10 @@ fn draw_rune_select(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &Ga
 
     d.draw_rectangle_rounded(Rectangle::new(btn_x, btn_y + shad, btn_w, btn_h), 0.2, 4, Color::BLACK.alpha(0.5));
     d.draw_rectangle_rounded(Rectangle::new(btn_x, btn_y + off, btn_w, btn_h), 0.2, 4, NEU_ORANGE);
-    d.draw_text("START RUN", (btn_x + 55.0) as i32, (btn_y + 20.0 + off) as i32, 28, Color::BLACK);
+    d.draw_text_ex(&assets.font_main, "START RUN", Vector2::new(btn_x + 55.0, btn_y + 20.0 + off), 28.0, 1.0, Color::BLACK);
 }
 
-fn draw_stats_menu(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
+fn draw_stats_menu(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &GameAssets) {
     let center_x = SCREEN_WIDTH / 2.0;
     let center_y = SCREEN_HEIGHT / 2.0;
     let box_w = 600.0;
@@ -410,10 +409,10 @@ fn draw_stats_menu(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
     let close_btn_x = center_x + box_w/2.0 - 45.0;
     let close_btn_y = center_y - box_h/2.0 + 15.0;
     d.draw_rectangle(close_btn_x as i32, close_btn_y as i32, 30, 30, NEU_RED);
-    d.draw_text("X", (close_btn_x + 8.0) as i32, (close_btn_y + 5.0) as i32, 20, Color::WHITE);
+    d.draw_text_ex(&assets.font_main, "X", Vector2::new(close_btn_x + 8.0, close_btn_y + 5.0), 20.0, 1.0, Color::WHITE);
 
-    d.draw_text("UPGRADES", (center_x - 100.0) as i32, (center_y - box_h/2.0 + 30.0) as i32, 40, NEU_ORANGE);
-    d.draw_text(&format!("Points Available: {}", stats.stat_points), (center_x - 120.0) as i32, (center_y - box_h/2.0 + 80.0) as i32, 30, PARCHMENT);
+    d.draw_text_ex(&assets.font_main, "UPGRADES", Vector2::new(center_x - 100.0, center_y - box_h/2.0 + 30.0), 40.0, 1.0, NEU_ORANGE);
+    d.draw_text_ex(&assets.font_main, &format!("Points Available: {}", stats.stat_points), Vector2::new(center_x - 120.0, center_y - box_h/2.0 + 80.0), 30.0, 1.0, PARCHMENT);
 
     let start_y = center_y - 100.0;
     let row_h = 60.0;
@@ -428,29 +427,29 @@ fn draw_stats_menu(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
 
     for (i, (label, val, _desc)) in stats_list.iter().enumerate() {
         let y = start_y + (i as f32 * row_h);
-        d.draw_text(label, (center_x - 200.0) as i32, y as i32, 30, Color::WHITE);
-        d.draw_text(val, (center_x - 20.0) as i32, y as i32, 30, NEU_YELLOW);
+        d.draw_text_ex(&assets.font_main, label, Vector2::new(center_x - 200.0, y), 30.0, 1.0, Color::WHITE);
+        d.draw_text_ex(&assets.font_main, val, Vector2::new(center_x - 20.0, y), 30.0, 1.0, NEU_YELLOW);
 
         if stats.stat_points > 0 {
             let btn_rect = Rectangle::new(center_x + 100.0, y, btn_w, btn_h);
             d.draw_rectangle_rounded(btn_rect, 0.2, 4, NEU_GREEN);
-            d.draw_text("+ UPGRADE", (btn_rect.x + 10.0) as i32, (btn_rect.y + 10.0) as i32, 20, Color::BLACK);
+            d.draw_text_ex(&assets.font_main, "+ UPGRADE", Vector2::new(btn_rect.x + 10.0, btn_rect.y + 10.0), 20.0, 1.0, Color::BLACK);
         }
     }
 }
 
 // Helpers
-fn draw_sort_buttons(d: &mut RaylibDrawHandle, _assets: &GameAssets) {
+fn draw_sort_buttons(d: &mut RaylibDrawHandle, assets: &GameAssets) {
     let rank_rect = Rectangle::new(SORT_RANK_POS.x, SORT_RANK_POS.y, SORT_BTN_WIDTH, SORT_BTN_HEIGHT);
     let suit_rect = Rectangle::new(SORT_SUIT_POS.x, SORT_SUIT_POS.y, SORT_BTN_WIDTH, SORT_BTN_HEIGHT);
 
     d.draw_rectangle_rounded(rank_rect, 0.2, 4, NEU_ORANGE);
     d.draw_rectangle_rounded_lines_ex(rank_rect, 0.2, 4, 2.0, Color::BLACK);
-    d.draw_text("Rank", (rank_rect.x + 40.0) as i32, (rank_rect.y + 10.0) as i32, 24, Color::BLACK);
+    d.draw_text_ex(&assets.font_main, "Rank", Vector2::new(rank_rect.x + 40.0, rank_rect.y + 10.0), 24.0, 1.0, Color::BLACK);
 
     d.draw_rectangle_rounded(suit_rect, 0.2, 4, NEU_BLUE);
     d.draw_rectangle_rounded_lines_ex(suit_rect, 0.2, 4, 2.0, Color::BLACK);
-    d.draw_text("Suit", (suit_rect.x + 40.0) as i32, (suit_rect.y + 10.0) as i32, 24, Color::BLACK);
+    d.draw_text_ex(&assets.font_main, "Suit", Vector2::new(suit_rect.x + 40.0, suit_rect.y + 10.0), 24.0, 1.0, Color::BLACK);
 }
 
 fn get_button_offset(d: &RaylibDrawHandle, rect: Rectangle) -> (f32, f32) {
@@ -465,7 +464,7 @@ fn get_button_offset(d: &RaylibDrawHandle, rect: Rectangle) -> (f32, f32) {
     (0.0, 3.0)
 }
 
-fn draw_relics(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
+fn draw_relics(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &GameAssets) {
     for (i, relic) in stats.equipped_relics.iter().enumerate() {
         let x = RELIC_START_X + (i as f32 * RELIC_SPACING);
         let y = RELIC_START_Y;
@@ -473,10 +472,8 @@ fn draw_relics(d: &mut RaylibDrawHandle, stats: &BaseModifiers) {
         d.draw_rectangle_rounded(rect, 0.2, 4, NEU_BLUE);
         d.draw_rectangle_rounded_lines_ex(rect, 0.2, 4, 2.0, NEU_ORANGE);
         let letter = &relic.name[0..1];
-        // Note: For relics, we might not have 'assets' passed here in the original struct,
-        // so we keep default text unless we change the signature to pass assets.
-        // For now, let's assume we stick to default or pass assets if you update the call in draw_scene.
-        d.draw_text(letter, (x + 20.0) as i32, (y + 15.0) as i32, 30, PARCHMENT);
+        // FIX: Use Custom Font
+        d.draw_text_ex(&assets.font_main, letter, Vector2::new(x + 20.0, y + 15.0), 30.0, 1.0, PARCHMENT);
     }
 }
 
@@ -499,25 +496,44 @@ fn draw_single_card(d: &mut RaylibDrawHandle, card: &Card, assets: &GameAssets) 
     d.draw_texture_pro(&assets.tex_spritesheet, source_rec, dest_rect, origin, card.rotation * 57.29, tint);
 }
 
-fn draw_shop(d: &mut RaylibDrawHandle, _stats: &BaseModifiers) { d.draw_text("Shop", 100, 100, 20, Color::WHITE); }
-fn draw_battle_result(d: &mut RaylibDrawHandle, _stats: &BaseModifiers) { d.draw_text("Battle Result", 100, 100, 20, Color::WHITE); }
+fn draw_shop(d: &mut RaylibDrawHandle, _stats: &BaseModifiers, assets: &GameAssets) {
+    d.draw_text_ex(&assets.font_main, "Shop", Vector2::new(100.0, 100.0), 20.0, 1.0, Color::WHITE);
+}
+fn draw_battle_result(d: &mut RaylibDrawHandle, _stats: &BaseModifiers, assets: &GameAssets) {
+    d.draw_text_ex(&assets.font_main, "Battle Result", Vector2::new(100.0, 100.0), 20.0, 1.0, Color::WHITE);
+}
 fn draw_dev_toolbox(_d: &mut RaylibDrawHandle) {}
-fn draw_menu(d: &mut RaylibDrawHandle) {
-    // Note: draw_menu doesn't have access to assets in the original signature.
-    // You must update `draw_menu` signature in `draw_scene` to `draw_menu(d, assets)` to use the font here.
-    // I will leave it as default for now to prevent compilation errors if the signature isn't updated.
-    let text = "ONE NIGHT BALATRO";
-    let font_size = 80;
-    let text_w = d.measure_text(text, font_size);
-    let x = (SCREEN_WIDTH as i32 - text_w) / 2;
-    let y = (SCREEN_HEIGHT as i32 / 2) - 100;
-    d.draw_text(text, x, y, font_size, PARCHMENT);
+fn draw_menu(d: &mut RaylibDrawHandle, assets: &GameAssets) {
+    let center_x = SCREEN_WIDTH / 2.0;
+    let center_y = SCREEN_HEIGHT / 2.0;
 
+    // Title
+    let title = "ONE NIGHT BALATRO";
+    let title_size = 80.0; // Must be f32 for draw_text_ex
+    let title_dim = assets.font_main.measure_text(title, title_size, 1.0);
+
+    d.draw_text_ex(
+        &assets.font_main,
+        title,
+        Vector2::new(center_x - title_dim.x / 2.0, center_y - 150.0),
+        title_size,
+        1.0,
+        PARCHMENT
+    );
+
+    // Subtitle
     let sub = "Click to Start";
-    let sub_size = 40;
-    let sub_w = d.measure_text(sub, sub_size);
-    let sx = (SCREEN_WIDTH as i32 - sub_w) / 2;
-    d.draw_text(sub, sx, y + 100, sub_size, Color::GRAY);
+    let sub_size = 40.0;
+    let sub_dim = assets.font_main.measure_text(sub, sub_size, 1.0);
+
+    d.draw_text_ex(
+        &assets.font_main,
+        sub,
+        Vector2::new(center_x - sub_dim.x / 2.0, center_y + 100.0),
+        sub_size,
+        1.0,
+        Color::GRAY
+    );
 }
 fn draw_enemy_monitor(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &GameAssets) {
     let w = 260.0;

@@ -22,9 +22,9 @@ pub struct GameAssets {
 impl GameAssets {
     pub fn load(rl: &mut RaylibHandle, thread: &RaylibThread) -> Self {
         // 1. Load Standard Assets
-        let mut tex_spritesheet = rl.load_texture(thread, "assets/resprite-cards/spritesheet.png")
+        // FIX: Removed 'mut' here
+        let tex_spritesheet = rl.load_texture(thread, "assets/resprite-cards/spritesheet.png")
             .expect("Failed to load spritesheet.");
-        tex_spritesheet.set_texture_filter(thread, TextureFilter::TEXTURE_FILTER_BILINEAR);
 
         let tex_background = rl.load_texture(thread, "assets/Final_bg.png")
             .or_else(|_| rl.load_texture(thread, "assets/bg/Final_bg.png"))
@@ -44,7 +44,7 @@ impl GameAssets {
         let tex_panel_blue = rl.load_texture(thread, banner_path).unwrap();
         let tex_panel_orange = rl.load_texture(thread, banner_path).unwrap();
 
-        // FIX: Directly expect the font. Do not use get_font_default() here.
+        // FIX: Directly expect the font
         let font_main = rl.load_font(thread, "assets/fonts/BoldPixels.ttf")
             .expect("Failed to load font: assets/fonts/BoldPixels.ttf");
 
