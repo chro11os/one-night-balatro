@@ -8,23 +8,8 @@ use crate::drawing::ui_elements::get_button_offset;
 
 
 pub fn draw_game_area(d: &mut RaylibDrawHandle, hand: &[Card], assets: &GameAssets, _stats: &BaseModifiers) {
-    let mut cards_to_draw: Vec<&Card> = hand.iter().collect();
-
-    // Sort cards for drawing order: Moving and Hovered cards last (drawn on top)
-    cards_to_draw.sort_by(|a, b| {
-        let a_is_active = a.is_moving() || a.is_hovered || a.is_selected;
-        let b_is_active = b.is_moving() || b.is_hovered || b.is_selected;
-
-        if a_is_active && !b_is_active {
-            std::cmp::Ordering::Greater // 'a' is active, 'b' is not, 'a' comes after 'b'
-        } else if !a_is_active && b_is_active {
-            std::cmp::Ordering::Less    // 'a' is not active, 'b' is, 'a' comes before 'b'
-        } else {
-            std::cmp::Ordering::Equal   // Both are active or both are inactive, maintain original order
-        }
-    });
-
-    for card in cards_to_draw.into_iter() {
+    // Draw cards in index order as there's no complex motion or Z-sorting needed.
+    for card in hand.iter() {
         draw_single_card(d, card, assets);
     }
 }

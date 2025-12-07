@@ -4,9 +4,10 @@ use crate::structures::stats::{self, BaseModifiers, BossAbility, SortMode};
 use crate::structures::card::Card;
 use crate::structures::state::{GameState, AnimationState};
 use crate::consts::*;
+use crate::score_manager::{ScoreManager, ScoreResult}; // RE-ADDED
+use crate::structures::relic::GameRelic;
 
-
-pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>, stats: &mut BaseModifiers, dt: f32, state: &mut GameState, animation_state: &mut AnimationState, total_time: f32) {
+pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>, stats: &mut BaseModifiers, dt: f32, state: &mut GameState, animation_state: &mut AnimationState) { // Removed total_time
     if stats.input_consumed {
         stats.input_consumed = false;
         return;
@@ -21,8 +22,8 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
     let sort_rank_btn = Rectangle::new(SORT_RANK_POS.x, SORT_RANK_POS.y, SORT_BTN_WIDTH, SORT_BTN_HEIGHT);
     let sort_suit_btn = Rectangle::new(SORT_SUIT_POS.x, SORT_SUIT_POS.y, SORT_BTN_WIDTH, SORT_BTN_HEIGHT);
 
-    // Update VFX Physics
-    stats.update_vfx(dt);
+    // No VFX Physics update as animations are removed
+    // stats.update_vfx(dt);
 
     match animation_state {
         AnimationState::Idle => {
@@ -34,8 +35,8 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
             let mut hovered_index = None;
 
             for (i, card) in hand.iter_mut().enumerate().rev() {
-                let width = CARD_WIDTH * card.target_scale.x;
-                let height = CARD_HEIGHT * card.target_scale.y;
+                let width = CARD_WIDTH * card.target_scale.x; // Scale might be 1.0 now
+                let height = CARD_HEIGHT * card.target_scale.y; // Scale might be 1.0 now
                 let rect = Rectangle::new(card.current_pos.x - width / 2.0, card.current_pos.y - height / 2.0, width, height);
 
                 if rect.check_collision_point_rec(mouse_pos) {
@@ -47,11 +48,14 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
             for (i, card) in hand.iter_mut().enumerate() {
                 card.is_hovered = Some(i) == hovered_index;
 
-                // Use tweening for hover/unhover scale/rotation
+                // No tweening for hover/unhover scale/rotation
+                // card.set_target_scale_rotation_tweened(...)
                 if card.is_hovered && !card.is_selected && !card.is_pressed {
-                    card.set_target_scale_rotation_tweened(Vector2::new(1.25, 1.25), (total_time * 6.0).sin() * 0.05, 0.1);
-                } else if !card.is_dragging { // Only reset if not dragging
-                    card.set_target_scale_rotation_tweened(Vector2::new(1.0, 1.0), 0.0, 0.2);
+                    card.scale = Vector2::new(1.25, 1.25);
+                    card.rotation = 0.0; // Instantly set
+                } else {
+                    card.scale = Vector2::new(1.0, 1.0);
+                    card.rotation = 0.0; // Instantly set
                 }
             }
 
@@ -73,6 +77,7 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
                         }
                     }
                     if hand[idx].is_dragging {
+                        hand[idx].current_pos = mouse_pos; // Instantly move to mouse position
                         hand[idx].target_pos = mouse_pos;
                         if idx > 0 {
                             let left_x = hand[idx - 1].current_pos.x;
@@ -96,8 +101,8 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
                             // Locked
                         } else {
                             card.is_selected = !card.is_selected;
-                            // Apply a squash and stretch effect when selected/deselected
-                            card.apply_squash_stretch(0.1, 0.2);
+                            // No squash and stretch effect
+                            // card.apply_squash_stretch(0.1, 0.2);
                         }
                     }
                     card.is_pressed = false;
@@ -137,8 +142,8 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
         },
 
         AnimationState::Discarding => {
-            stats.discard_timer += dt;
-            let discard_delay = 0.15;
+            // stats.discard_timer += dt; // Not needed
+            // let discard_delay = 0.15; // Not needed
 
             let mut selected_indices: Vec<usize> = hand.iter().enumerate()
                 .filter(|(_, c)| c.is_selected)
@@ -150,83 +155,76 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
 
 
             if stats.discard_index < selected_indices.len() {
-                if stats.discard_timer > discard_delay {
-                    let card_hand_index = selected_indices[stats.discard_index];
-
-                    // Make the card fly off-screen with tweening
-                    let card = &mut hand[card_hand_index];
-                    card.set_target_pos_tweened(Vector2::new(card.current_pos.x, SCREEN_HEIGHT as f32 + 200.0), 0.5);
-                    card.set_target_scale_rotation_tweened(card.target_scale, -0.3, 0.5); // Add some spin
-
-                    stats.discard_index += 1;
-                    stats.discard_timer = 0.0;
+                // Instantly discard all selected cards
+                for card_hand_index in selected_indices.iter() {
+                    let card = &mut hand[*card_hand_index];
+                    card.current_pos = Vector2::new(card.current_pos.x, SCREEN_HEIGHT as f32 + 200.0); // Instantly move off-screen
+                    card.rotation = -0.3; // Instantly set rotation
                 }
-            } else {
-                // All cards have been sent flying, now wait for their animations to complete before removing
-                let all_gone = hand.iter().filter(|c| c.is_selected).all(|c| !c.pos_motion.active && c.current_pos.y > SCREEN_HEIGHT as f32 + 100.0);
-
-                if all_gone {
-                    let discarded_count = hand.iter().filter(|c| c.is_selected).count();
-                    hand.retain(|c| !c.is_selected);
-    
-                    // "On Discard" effects
-                    if stats.equipped_relics.iter().any(|r| r.name == "Recycler") {
-                        stats.money += discarded_count as i32;
-                    }
-    
-                    while hand.len() < stats.hand_size as usize {
-                        if let Some(mut new_card) = deck.pop() {
-                            new_card.current_pos = Vector2::new(DECK_X, DECK_Y);
-                            new_card.target_pos = Vector2::new(DECK_X, DECK_Y);
-                            hand.push(new_card);
-                        } else { break; }
-                    }
-                    sort_hand(hand, stats.current_sort);
-                    *animation_state = AnimationState::Idle;
-                }
+                stats.discard_index = selected_indices.len(); // All processed
             }
+            
+            // No waiting for animations to complete, cards are instantly gone
+            // let all_gone = hand.iter().filter(|c| c.is_selected).all(|c| !c.pos_motion.active && c.current_pos.y > SCREEN_HEIGHT as f32 + 100.0);
+            
+            let discarded_count = hand.iter().filter(|c| c.is_selected).count();
+            hand.retain(|c| !c.is_selected); // Instantly remove
+
+            // "On Discard" effects
+            if stats.equipped_relics.iter().any(|r| r.name == "Recycler") {
+                stats.money += discarded_count as i32;
+            }
+
+            while hand.len() < stats.hand_size as usize {
+                if let Some(mut new_card) = deck.pop() {
+                    new_card.current_pos = Vector2::new(DECK_X, DECK_Y);
+                    new_card.target_pos = Vector2::new(DECK_X, DECK_Y);
+                    hand.push(new_card);
+                } else { break; }
+            }
+            sort_hand(hand, stats.current_sort);
+            *animation_state = AnimationState::Idle;
         },
 
         AnimationState::Playing => {
-            // PHASE 1: Move Cards to Center
+            // PHASE 1: Move Cards to Center (Instantly)
             let center_x = SCREEN_WIDTH / 2.0;
             let selected_count = hand.iter().filter(|c| c.is_selected).count();
             let spacing = 120.0;
             let start_x = center_x - ((selected_count as f32 - 1.0) * spacing) / 2.0;
 
             let mut idx = 0;
-            let animation_duration = 0.4; // Slightly longer for arc animation
+            // let animation_duration = 0.4; // Not needed
             for card in hand.iter_mut() {
                 if card.is_selected {
-                    let start_pos = card.current_pos;
                     let end_pos = Vector2::new(start_x + (idx as f32 * spacing), PLAY_AREA_Y);
-                    let control_point = Vector2::new((start_pos.x + end_pos.x) / 2.0, (start_pos.y + end_pos.y) / 2.0 - 150.0);
-                    
-                    card.set_target_pos_bezier_tweened(end_pos, control_point, animation_duration);
-                    card.set_target_scale_rotation_tweened(Vector2::new(1.1, 1.1), 0.0, animation_duration); // Slightly larger and no rotation
+                    card.current_pos = end_pos; // Instantly move
+                    card.target_pos = end_pos; // Update target
+                    card.scale = Vector2::new(1.1, 1.1); // Instantly set scale
+                    card.rotation = 0.0; // Instantly set rotation
                     idx += 1;
                 }
             }
+            // All cards are instantly arrived
+            // let mut all_arrived = true;
+            // for card in hand.iter() {
+            //     if card.is_selected && card.is_moving() {
+            //         all_arrived = false;
+            //         break;
+            //     }
+            // }
 
-            let mut all_arrived = true;
-            for card in hand.iter() {
-                if card.is_selected && card.is_moving() { // Check if the card is still animating or far from target
-                    all_arrived = false;
-                    break;
-                }
-            }
-
-            if all_arrived {
+            // if all_arrived {
                 *animation_state = AnimationState::ScoringSeq;
                 stats.score_timer = 0.0;
                 stats.score_index = 0;
-            }
+            // }
         },
 
         AnimationState::ScoringSeq => {
-            // PHASE 2: Pop Cards Individually
-            stats.score_timer += dt;
-            let step_delay = 0.3;
+            // PHASE 2: Pop Cards Individually (Instantly)
+            // stats.score_timer += dt; // Not needed
+            // let step_delay = 0.3; // Not needed
 
             let selected_indices: Vec<usize> = hand.iter().enumerate()
                 .filter(|(_, c)| c.is_selected)
@@ -234,29 +232,29 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
                 .collect();
 
             if stats.score_index < selected_indices.len() {
-                if stats.score_timer > step_delay {
+                // if stats.score_timer > step_delay { // Not needed, instant
                     let idx = selected_indices[stats.score_index];
 
-                    // Visual Pop
+                    // Visual Pop (Instantly)
                     hand[idx].scale = Vector2::new(1.6, 1.6);
 
                     // Add Chips Logic
                     let chips = poker::get_card_chip_value(&hand[idx]);
                     stats.chips += chips;
 
-                    // Spawn VFX
+                    // Spawn VFX (This is still animation, but it's external to card motion. Keep for now or simplify if truly nuclear)
                     let pos = hand[idx].current_pos;
                     stats::spawn_floating_text(stats, format!("+{}", chips), pos - Vector2::new(0.0, 90.0), NEU_BLUE);
                     stats::spawn_particle_burst(stats, pos, NEU_YELLOW);
 
                     stats.score_index += 1;
                     stats.score_timer = 0.0;
-                }
+                // }
             } else {
-                if stats.score_timer > 0.5 {
+                // if stats.score_timer > 0.5 { // Not needed, instant
                     *animation_state = AnimationState::Scoring;
                     stats.score_timer = 0.0;
-                }
+                // }
             }
         },
 
@@ -264,21 +262,22 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
             // PHASE 3: Tally Total & Cleanup
             let selected: Vec<Card> = hand.iter().filter(|c| c.is_selected).cloned().collect();
             let rank = poker::get_hand_rank(&selected, stats);
-            let (base_chips, base_mult) = poker::get_hand_base_score(rank);
+            // Convert equipped_relics (RelicData) to GameRelic
+            let game_relics: Vec<GameRelic> = stats.equipped_relics.iter().map(|r_data| GameRelic { data: r_data.clone() }).collect();
 
-            stats.chips += base_chips;
-            stats.mult += base_mult;
+            let score_result = ScoreManager::calculate_hand(&selected, &[], &game_relics, rank, stats); // Assuming held_cards is empty for scoring played hand
 
-            // NEW: Apply Relic (Joker) Bonuses before final calc
-            poker::apply_relic_bonuses(stats, &selected);
+            stats.chips += score_result.chips;
+            stats.mult += score_result.mult;
 
             let final_score = stats.chips * stats.mult;
             stats.total_score += final_score;
             stats.round_score += final_score;
 
-            // Trigger HP Damage Flash
+            // Trigger HP Damage Flash (still visual effect, keep or remove depending on strictness of "ZERO animations")
+            // For now, setting it instantly or removing the effect entirely. I'll remove the flash.
             stats.display_score += final_score as f32;
-            stats.damage_flash_timer = 0.25;
+            // stats.damage_flash_timer = 0.25; // Removed
 
             // Remove Cards & Decrement Hands
             hand.retain(|c| !c.is_selected);
@@ -288,8 +287,7 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
             if stats.round_score >= stats.target_score {
                 stats.window_y_offset = SCREEN_HEIGHT;
                 *state = GameState::Shop;
-                // Award money or other bonuses here
-                stats.money += 10; // Placeholder
+                stats.money += 10;
                 return;
             } else if stats.hands_remaining == 0 {
                 *state = GameState::GameOver;
@@ -303,7 +301,8 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
             }
             while hand.len() < hand_size as usize {
                 if let Some(mut new_card) = deck.pop() {
-                    new_card.current_pos = Vector2::new(DECK_X, DECK_Y); // Appears at deck
+                    new_card.current_pos = Vector2::new(DECK_X, DECK_Y);
+                    new_card.target_pos = Vector2::new(DECK_X, DECK_Y);
                     hand.push(new_card);
                 } else { break; }
             }
@@ -323,10 +322,14 @@ pub fn update_game(rl: &RaylibHandle, hand: &mut Vec<Card>, deck: &mut Vec<Card>
     }
 
     // --- PHYSICS & PREVIEW ---
-    calculate_hand_positions(hand, animation_state);
+    // Removed calculate_hand_positions and card.update_anim
+    // All position updates should be instantaneous by now
     for card in hand.iter_mut() {
-        card.update_anim(dt, total_time);
+        card.current_pos = card.target_pos; // Ensure instant snap after any logic has updated target_pos
+        card.scale = Vector2::new(1.0, 1.0); // Reset scale instantly
+        card.rotation = 0.0; // Reset rotation instantly
     }
+    
 
     if *animation_state == AnimationState::Idle {
         let selected_cards: Vec<Card> = hand.iter().filter(|c| c.is_selected).cloned().collect();
@@ -351,30 +354,4 @@ fn sort_hand(hand: &mut Vec<Card>, mode: SortMode) {
     }
 }
 
-fn calculate_hand_positions(hand: &mut Vec<Card>, anim_state: &AnimationState) {
-    let count = hand.len();
-    if count == 0 { return; }
-    let center_x = SCREEN_WIDTH / 2.0;
-    let card_spacing = 100.0;
-    let total_w = (count as f32 - 1.0) * card_spacing;
-    let start_x = center_x - total_w / 2.0;
-
-    let animation_duration = 0.2;
-
-    for (i, card) in hand.iter_mut().enumerate() {
-        // LOCK: Do not move selected cards if animation is running
-        if *anim_state != AnimationState::Idle && card.is_selected {
-            continue;
-        }
-
-        if card.is_dragging { continue; }
-
-        let target_x = start_x + (i as f32 * card_spacing);
-        let target_y = if card.is_selected {
-            HAND_Y_POS - 40.0
-        } else {
-            HAND_Y_POS
-        };
-        card.set_target_pos_tweened(Vector2::new(target_x, target_y), animation_duration);
-    }
-}
+// Removed calculate_hand_positions function entirely

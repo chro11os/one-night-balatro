@@ -71,7 +71,7 @@ fn main() {
 
         match current_state {
             GameState::Menu => logic::update_menu(&rl, &mut current_state),
-            GameState::Playing => logic::update_game(&rl, &mut hand, &mut deck, &mut stats, dt, &mut current_state, &mut animation_state, total_time),
+            GameState::Playing => logic::update_game(&rl, &mut hand, &mut deck, &mut stats, dt, &mut current_state, &mut animation_state),
             GameState::RuneSelect => logic::update_rune_select(&rl, &mut current_state, &mut stats),
             GameState::Shop => logic::update_shop(&mut rl, &mut current_state, &mut stats, &mut hand, &mut deck),
             GameState::StatsMenu => logic::update_stats_menu(&rl, &mut current_state, &mut stats),
