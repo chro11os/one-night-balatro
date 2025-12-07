@@ -28,7 +28,8 @@ pub struct EnemyData {
 pub fn load_relics() -> Vec<RelicData> {
     let data = fs::read_to_string("assets/data/relics.json")
         .expect("Unable to read relics.json");
-    serde_json::from_str(&data).expect("JSON was not well-formatted")
+    let all_relics: Vec<RelicData> = serde_json::from_str(&data).expect("JSON was not well-formatted");
+    all_relics.into_iter().filter(|relic| relic.name != "Banned").collect()
 }
 
 pub fn load_enemies() -> EnemyData {

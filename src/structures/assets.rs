@@ -17,6 +17,8 @@ pub struct GameAssets {
 
     // Store Rune Icons
     pub rune_icons: HashMap<String, Texture2D>,
+    // Store Relic Icons
+    pub relic_icons: HashMap<String, Texture2D>,
 }
 
 impl GameAssets {
@@ -48,7 +50,7 @@ impl GameAssets {
         let font_main = rl.load_font(thread, "assets/fonts/BoldPixels.ttf")
             .expect("Failed to load font: assets/fonts/BoldPixels.ttf");
 
-        // 2. Load Rune Icons
+        // 2. Load Rune Icons Individually
         let mut rune_icons = HashMap::new();
 
         let categories = [
@@ -67,11 +69,26 @@ impl GameAssets {
                     rune_icons.insert(name.to_string(), tex);
                     println!("Loaded Icon: {}", name);
                 } else {
-                    println!("> Warning: Icon not found: {}", path);
+                    println!("> Warning: Rune Icon not found: {}", path);
                 }
             }
         }
 
+        // 3. Load Relic Icons Individually
+        let mut relic_icons = HashMap::new();
+        let relic_names = vec!["Bag of Holding", "Fading Torch", "Recycler"]; // Populate with actual relic names
+
+        for name in relic_names {
+            let path = format!("assets/relic_icons/{}_icon.png", name.to_lowercase().replace(" ", "_"));
+            if let Ok(tex) = rl.load_texture(thread, &path) {
+                tex.set_texture_filter(thread, TextureFilter::TEXTURE_FILTER_BILINEAR);
+                relic_icons.insert(name.to_string(), tex);
+                println!("Loaded Relic Icon: {}", name);
+            } else {
+                println!("> Warning: Relic Icon not found: {}", path);
+            }
+        }
+        
         Self {
             tex_spritesheet,
             tex_background,
@@ -84,6 +101,7 @@ impl GameAssets {
             tex_panel_orange,
             font_main,
             rune_icons,
+            relic_icons,
         }
     }
 }

@@ -1,10 +1,12 @@
 mod window_init;
-mod draw_scene;
+mod drawing;
 mod logic;
 mod consts;
 mod structures;
 mod poker;
 mod bench;
+mod utils;
+mod score_manager;
 
 use raylib::prelude::*;
 use structures::card::Card;
@@ -21,10 +23,10 @@ fn main() {
 
     println!("Loading Game Data...");
     stats.enemy_database = Some(structures::data_loader::load_enemies());
-    stats.relic_database = structures::data_loader::load_relics();
+    stats.all_relics = structures::data_loader::load_relics();
     stats.available_runes = structures::data_loader::load_runes();
 
-    println!("> Loaded {} Relics", stats.relic_database.len());
+    println!("> Loaded {} Relics", stats.all_relics.len());
     println!("> Loaded {} Runes", stats.available_runes.len());
 
     // FIX: Start in RuneSelect so we see the new screen immediately!
@@ -71,17 +73,17 @@ fn main() {
             GameState::Menu => logic::update_menu(&rl, &mut current_state),
             GameState::Playing => logic::update_game(&rl, &mut hand, &mut deck, &mut stats, dt, &mut current_state, &mut animation_state, total_time),
             GameState::RuneSelect => logic::update_rune_select(&rl, &mut current_state, &mut stats),
-            GameState::Shop => logic::update_shop(&rl, &mut current_state, &mut stats, &mut hand, &mut deck),
+            GameState::Shop => logic::update_shop(&mut rl, &mut current_state, &mut stats, &mut hand, &mut deck),
             GameState::StatsMenu => logic::update_stats_menu(&rl, &mut current_state, &mut stats),
-            GameState::BattleResult => logic::update_battle_result(&rl, &mut current_state, &mut stats),
+            GameState::BattleResult => logic::update_battle_result(&mut rl, &mut current_state, &mut stats),
             GameState::Settings => if rl.is_key_pressed(KeyboardKey::KEY_ESCAPE) { current_state = GameState::Menu; },
             GameState::GameOver => {
                 if rl.is_key_pressed(KeyboardKey::KEY_R) {
                     let saved_enemies = stats.enemy_database.clone();
-                    let saved_relics = stats.relic_database.clone();
+                    let saved_relics = stats.all_relics.clone();
                     stats = BaseModifiers::default();
                     stats.enemy_database = saved_enemies;
-                    stats.relic_database = saved_relics;
+                    stats.all_relics = saved_relics;
                     stats.available_runes = structures::data_loader::load_runes(); // Reload runes too
 
                     let (new_hand, new_deck) = setup_game(stats.hand_size);
@@ -95,9 +97,14 @@ fn main() {
         }
         bench.record_update(update_start.elapsed());
 
+        stats.update_screen_shake(dt); // Update screen shake trauma and offset
+
+        // Update cached strings after all logic for the frame has run
+        stats.update_cached_strings();
+
         let draw_start = Instant::now();
         let mut d = rl.begin_drawing(&thread);
-        draw_scene::draw_scene(&mut d, &stats, &hand[..], &current_state, &assets, &animation_state);
+        drawing::draw_scene(&mut d, &stats, &hand, &current_state, &assets, &animation_state);
         bench.record_draw(draw_start.elapsed());
         drop(d);
         bench.end_frame(frame_start);

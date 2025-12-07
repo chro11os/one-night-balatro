@@ -1,7 +1,7 @@
 use crate::structures::card::Card;
 use crate::structures::hand::HandRank;
 use std::collections::HashMap;
-use crate::structures::stats::BaseModifiers; // Added this import
+use crate::structures::stats::{BaseModifiers, BossAbility}; // Added this import
 // ... [get_counts, is_flush, is_straight, get_hand_base_score, get_card_chip_value remain exactly the same] ...
 // (Paste previous helper functions here if replacing file, or append this new function)
 
@@ -61,12 +61,20 @@ pub fn get_card_chip_value(card: &Card) -> i32 {
     }
 }
 
-pub fn get_hand_rank(hand: &[Card]) -> HandRank {
+pub fn get_hand_rank(hand: &[Card], stats: &BaseModifiers) -> HandRank {
     let counts = get_counts(hand);
     let flush = is_flush(hand);
     let straight = is_straight(hand);
 
-    if straight && flush { return HandRank::StraightFlush; }
+    if straight && flush {
+        if let BossAbility::SilenceSuit(silenced_suit) = stats.active_ability {
+            if hand[0].suit != silenced_suit {
+                return HandRank::StraightFlush;
+            }
+        } else {
+            return HandRank::StraightFlush;
+        }
+    }
 
     let mut pairs = 0;
     let mut threes = 0;
@@ -83,7 +91,15 @@ pub fn get_hand_rank(hand: &[Card]) -> HandRank {
 
     if fours == 1 { return HandRank::FourOfAKind; }
     if threes == 1 && pairs == 1 { return HandRank::FullHouse; }
-    if flush { return HandRank::Flush; }
+    if flush {
+        if let BossAbility::SilenceSuit(silenced_suit) = stats.active_ability {
+            if hand[0].suit != silenced_suit {
+                return HandRank::Flush;
+            }
+        } else {
+            return HandRank::Flush;
+        }
+    }
     if straight { return HandRank::Straight; }
     if threes == 1 { return HandRank::ThreeOfAKind; }
     if pairs == 2 { return HandRank::TwoPair; }
@@ -92,7 +108,7 @@ pub fn get_hand_rank(hand: &[Card]) -> HandRank {
     HandRank::HighCard
 }
 pub fn apply_relic_bonuses(stats: &mut BaseModifiers, hand: &[Card]) {
-    let rank = get_hand_rank(hand);
+    let rank = get_hand_rank(hand, stats);
 
     // Clone relics to avoid immutable borrow of stats while mutating it
     let relics = stats.equipped_relics.clone();
@@ -118,13 +134,21 @@ pub fn apply_relic_bonuses(stats: &mut BaseModifiers, hand: &[Card]) {
             "j_family" => {
                 if rank == HandRank::FourOfAKind { stats.mult *= 4; }
             },
+            "relic_twin_daggers" => {
+                if rank == HandRank::Pair || rank == HandRank::TwoPair {
+                    stats.mult += 1;
+                }
+            },
+            "relic_fading_torch" => {
+                stats.mult += 20;
+            },
             _ => {}
         }
     }
 }
 // NEW: Helper to identify which cards actully contribute to the hand
-pub fn get_scoring_ids(hand: &[Card]) -> Vec<i32> {
-    let rank = get_hand_rank(hand);
+pub fn get_scoring_ids(hand: &[Card], stats: &BaseModifiers) -> Vec<i32> {
+    let rank = get_hand_rank(hand, stats);
     let counts = get_counts(hand);
     let mut ids = Vec::new();
 

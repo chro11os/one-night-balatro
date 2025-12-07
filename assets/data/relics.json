@@ -28,5 +28,17 @@
     "name": "Bag of Holding",
     "description": "+1 Hand Size, +1 Discard.",
     "value": 0
+  },
+  {
+    "id": "relic_recycler",
+    "name": "Recycler",
+    "description": "Gain $1 for each card discarded.",
+    "value": 10
+  },
+  {
+    "id": "relic_banned",
+    "name": "Banned",
+    "description": "This should not appear in the game.",
+    "value": 0
   }
 ]

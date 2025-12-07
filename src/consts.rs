@@ -87,3 +87,16 @@ pub const DEV_BOX_Y: f32 = 20.0;
 pub const DEV_BTN_W: f32 = 180.0;
 pub const DEV_BTN_H: f32 = 40.0;
 pub const DEV_GAP: f32 = 10.0;
+
+// --- SHOP LAYOUT ---
+pub const SHOP_ITEM_W: f32 = 300.0;
+pub const SHOP_ITEM_H: f32 = 400.0;
+pub const SHOP_ITEM_GAP: f32 = 50.0;
+pub const SHOP_START_X: f32 = (SCREEN_WIDTH - (3.0 * SHOP_ITEM_W + 2.0 * SHOP_ITEM_GAP)) / 2.0;
+pub const SHOP_START_Y: f32 = 200.0;
+pub const SHOP_LEAVE_BTN_RECT: raylib::math::Rectangle = raylib::math::Rectangle {
+    x: SCREEN_WIDTH / 2.0 - 100.0,
+    y: SCREEN_HEIGHT - 100.0,
+    width: 200.0,
+    height: 50.0
+};

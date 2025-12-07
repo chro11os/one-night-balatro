@@ -14,7 +14,9 @@ pub enum GameState {
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum AnimationState {
     Idle,
+    Dealing,
     Playing,
     ScoringSeq,
     Scoring,
+    Discarding,
 }
