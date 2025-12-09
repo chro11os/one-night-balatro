@@ -15,7 +15,8 @@ pub enum GameState {
 pub enum AnimationState {
     Idle,
     Dealing,
-    Playing,
+    Playing, // Old one, might be unused
+    PlayingAnimation, // NEW: For the fly-to-center sequence
     ScoringSeq,
     Scoring,
     Discarding,

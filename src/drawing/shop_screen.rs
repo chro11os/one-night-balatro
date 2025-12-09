@@ -16,13 +16,13 @@ pub fn draw_shop(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &GameA
         d.draw_rectangle_rounded(rect, 0.1, 4, NEU_BLACK.alpha(0.9));
         d.draw_rectangle_rounded_lines_ex(rect, 0.1, 4, 3.0, NEU_ORANGE);
 
-        d.draw_text_ex(&assets.font_main, &relic.name, Vector2::new(x + 20.0, y + 20.0), 30.0, 1.0, PARCHMENT);
+        d.draw_text_ex(&assets.font_main, &relic.data.name, Vector2::new(x + 20.0, y + 20.0), 30.0, 1.0, PARCHMENT);
 
         // Text wrapping for description
         let max_text_width = SHOP_ITEM_W - 40.0;
         let font_size = 20.0;
         let mut current_y = y + 70.0;
-        for paragraph in relic.description.split('\n') {
+        for paragraph in relic.data.description.split('\n') {
             let words: Vec<&str> = paragraph.split_whitespace().collect();
             let mut current_line = String::new();
 
@@ -42,7 +42,7 @@ pub fn draw_shop(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &GameA
             }
         }
 
-        d.draw_text_ex(&assets.font_main, &format!("Price: ${}", relic.value), Vector2::new(x + 20.0, y + SHOP_ITEM_H - 50.0), 24.0, 1.0, NEU_YELLOW);
+        d.draw_text_ex(&assets.font_main, &format!("Price: ${}", relic.data.value.unwrap_or(0)), Vector2::new(x + 20.0, y + SHOP_ITEM_H - 50.0), 24.0, 1.0, NEU_YELLOW);
     }
 
     let mut leave_btn = SHOP_LEAVE_BTN_RECT;

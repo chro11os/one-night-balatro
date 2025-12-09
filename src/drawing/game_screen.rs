@@ -37,6 +37,7 @@ pub fn draw_action_panel(d: &mut RaylibDrawHandle, stats: &BaseModifiers, _anim:
     let y = A_PANEL_Y;
     let w = A_PANEL_W;
     let h = A_PANEL_H;
+
     d.draw_rectangle_rounded(Rectangle::new(x, y, w, h), 0.1, 4, NEU_BLACK.alpha(0.9));
     d.draw_rectangle_rounded_lines_ex(Rectangle::new(x, y, w, h), 0.1, 4, 3.0, NEU_RED);
 
@@ -165,7 +166,7 @@ pub fn draw_relics(d: &mut RaylibDrawHandle, stats: &BaseModifiers, assets: &Gam
         let rect = Rectangle::new(x, y, RELIC_SIZE, RELIC_SIZE);
         d.draw_rectangle_rounded(rect, 0.2, 4, NEU_BLUE);
         d.draw_rectangle_rounded_lines_ex(rect, 0.2, 4, 2.0, NEU_ORANGE);
-        let letter = &relic.name[0..1];
+        let letter = &relic.data.name[0..1];
         // FIX: Use Custom Font
         d.draw_text_ex(&assets.font_main, letter, Vector2::new(x + 20.0, y + 15.0), 30.0, 1.0, PARCHMENT);
     }

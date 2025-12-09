@@ -19,86 +19,96 @@ use std::time::Instant;
 fn main() {
     let (mut rl, thread) = window_init::initialize_window();
     let mut stats = BaseModifiers::default();
-    let assets = GameAssets::load(&mut rl, &thread);
 
-    println!("Loading Game Data...");
-    stats.enemy_database = Some(structures::data_loader::load_enemies());
-    stats.all_relics = structures::data_loader::load_relics();
-    stats.available_runes = structures::data_loader::load_runes();
+    // 1. Load Assets & All Game Data
+    let mut assets = GameAssets::load(&mut rl, &thread);
+    structures::data_loader::load_all_data(&mut assets);
 
-    println!("> Loaded {} Relics", stats.all_relics.len());
-    println!("> Loaded {} Runes", stats.available_runes.len());
+    println!("> Loaded {} Relics", assets.relics_db.len());
+    println!("> Loaded {} Runes", assets.runes_db.len());
 
-    // FIX: Start in RuneSelect so we see the new screen immediately!
+    // 2. Transfer Data References to Stats
+    stats.all_relics = assets.relics_db.clone();
+    stats.all_consumables = assets.consumables_db.clone();
+    stats.all_heirlooms = assets.heirlooms_db.clone();
+    stats.enemy_database = Some(assets.enemies_db.clone());
+    stats.available_runes = assets.runes_db.values().cloned().collect();
+
     let mut current_state = GameState::RuneSelect;
     let mut animation_state = AnimationState::Idle;
     let mut bench = bench::GameBench::new();
 
-    let setup_game = |hand_size: i32| -> (Vec<Card>, Vec<Card>) {
-        let mut all_cards = Vec::with_capacity(52);
-        let mut id_counter = 0;
-        for suit in 0..4 {
-            for val in 2..15 {
-                let mut card = Card::new(id_counter, DECK_X);
-                card.suit = suit;
-                card.value = val;
-                all_cards.push(card);
-                id_counter += 1;
-            }
-        }
-        for i in 0..all_cards.len() {
-            let swap_idx = unsafe { raylib::ffi::GetRandomValue(0, 51) } as usize;
-            all_cards.swap(i, swap_idx);
-        }
-        let mut hand = Vec::with_capacity(6);
-        for _ in 0..hand_size {
-            if let Some(mut card) = all_cards.pop() {
-                hand.push(card);
-            }
-        }
-        (hand, all_cards)
-    };
+    // 3. Initialize Game State (Deck, Enemy, Hand)
+    // --- FIX START ---
+    let mut deck = Vec::new();
+    let mut hand = Vec::new();
 
-    let (mut hand, mut deck) = setup_game(stats.hand_size);
-    stats.deck_count = deck.len() as i32;
+    // A. Generate Deck & Enemy via Logic (Uses the shuffle logic from game.rs)
+    logic::game::start_next_round(&mut stats, &mut deck);
+    stats.round = 1; // Reset round count to 1
 
-    while !rl.window_should_close() && current_state != GameState::Exit {
+    // B. Deal Initial Hand (So we don't start with 0 cards)
+    while hand.len() < stats.hand_size as usize {
+        if let Some(mut card) = deck.pop() {
+            card.current_pos = Vector2::new(DECK_X, DECK_Y);
+            hand.push(card);
+        } else {
+            break;
+        }
+    }
+
+    // Sort for visual clarity
+    stats.current_sort = structures::stats::SortMode::Rank;
+    hand.sort_by(|a, b| b.value.cmp(&a.value).then(a.suit.cmp(&b.suit)));
+    // --- FIX END ---
+
+    while !rl.window_should_close() {
         let frame_start = bench.start_frame();
         let dt = rl.get_frame_time();
-        let _total_time = rl.get_time() as f32;
-        let update_start = Instant::now();
 
+        let update_start = Instant::now();
         match current_state {
             GameState::Menu => logic::update_menu(&rl, &mut current_state),
-            GameState::Playing => logic::update_game(&rl, &mut hand, &mut deck, &mut stats, dt, &mut current_state, &mut animation_state),
             GameState::RuneSelect => logic::update_rune_select(&rl, &mut current_state, &mut stats),
-            GameState::Shop => logic::update_shop(&mut rl, &mut current_state, &mut stats, &mut hand, &mut deck),
-            GameState::StatsMenu => logic::update_stats_menu(&rl, &mut current_state, &mut stats),
+            GameState::Playing => logic::update_game(&rl, &mut hand, &mut deck, &mut stats, dt, &mut current_state, &mut animation_state),
             GameState::BattleResult => logic::update_battle_result(&mut rl, &mut current_state, &mut stats),
-            GameState::Settings => if rl.is_key_pressed(KeyboardKey::KEY_ESCAPE) { current_state = GameState::Menu; },
+            GameState::StatsMenu => logic::update_stats_menu(&rl, &mut current_state, &mut stats),
+            GameState::Shop => logic::update_shop(&mut rl, &mut current_state, &mut stats, &mut deck),
             GameState::GameOver => {
                 if rl.is_key_pressed(KeyboardKey::KEY_R) {
-                    let saved_enemies = stats.enemy_database.clone();
+                    // Reset Logic
+                    let saved_db = stats.enemy_database.clone();
                     let saved_relics = stats.all_relics.clone();
-                    stats = BaseModifiers::default();
-                    stats.enemy_database = saved_enemies;
-                    stats.all_relics = saved_relics;
-                    stats.available_runes = structures::data_loader::load_runes(); // Reload runes too
+                    let saved_runes = stats.available_runes.clone();
 
-                    let (new_hand, new_deck) = setup_game(stats.hand_size);
-                    hand = new_hand;
-                    deck = new_deck;
+                    stats = BaseModifiers::default();
+                    stats.enemy_database = saved_db;
+                    stats.all_relics = saved_relics;
+                    stats.available_runes = saved_runes;
+
+                    // Re-init deck & hand using the same logic
+                    deck.clear();
+                    hand.clear();
+                    logic::game::start_next_round(&mut stats, &mut deck);
+                    stats.round = 1;
+
+                    while hand.len() < stats.hand_size as usize {
+                        if let Some(mut card) = deck.pop() {
+                            card.current_pos = Vector2::new(DECK_X, DECK_Y);
+                            hand.push(card);
+                        } else { break; }
+                    }
+                    hand.sort_by(|a, b| b.value.cmp(&a.value).then(a.suit.cmp(&b.suit)));
+
                     stats.deck_count = deck.len() as i32;
-                    current_state = GameState::RuneSelect; // Restart to RuneSelect
+                    current_state = GameState::RuneSelect;
                 }
             }
             _ => {}
         }
         bench.record_update(update_start.elapsed());
 
-        stats.update_screen_shake(dt); // Update screen shake trauma and offset
-
-        // Update cached strings after all logic for the frame has run
+        stats.update_screen_shake(dt);
         stats.update_cached_strings();
 
         let draw_start = Instant::now();

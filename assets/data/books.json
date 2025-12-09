@@ -1,0 +1,132 @@
+[
+  {
+    "id": "book_high_card",
+    "name": "Guide to High Card",
+    "rarity": "Common",
+    "cost": 3,
+    "effect": {
+      "type": "LevelUp",
+      "target": "High Card",
+      "chips": 10,
+      "mult": 1
+    },
+    "description": "Level up High Card. +1 Mult and +10 Chips."
+  },
+  {
+    "id": "book_pair",
+    "name": "Guide to Pair",
+    "rarity": "Common",
+    "cost": 3,
+    "effect": {
+      "type": "LevelUp",
+      "target": "Pair",
+      "chips": 15,
+      "mult": 1
+    },
+    "description": "Level up Pair. +1 Mult and +15 Chips."
+  },
+  {
+    "id": "book_two_pair",
+    "name": "Guide to Two Pair",
+    "rarity": "Common",
+    "cost": 3,
+    "effect": {
+      "type": "LevelUp",
+      "target": "Two Pair",
+      "chips": 20,
+      "mult": 1
+    },
+    "description": "Level up Two Pair. +1 Mult and +20 Chips."
+  },
+  {
+    "id": "book_three_kind",
+    "name": "Guide to Three of a Kind",
+    "rarity": "Common",
+    "cost": 3,
+    "effect": {
+      "type": "LevelUp",
+      "target": "Three of a Kind",
+      "chips": 20,
+      "mult": 2
+    },
+    "description": "Level up Three of a Kind. +2 Mult and +20 Chips."
+  },
+  {
+    "id": "book_straight",
+    "name": "Guide to Straight",
+    "rarity": "Uncommon",
+    "cost": 4,
+    "effect": {
+      "type": "LevelUp",
+      "target": "Straight",
+      "chips": 30,
+      "mult": 3
+    },
+    "description": "Level up Straight. +3 Mult and +30 Chips."
+  },
+  {
+    "id": "book_flush",
+    "name": "Guide to Flush",
+    "rarity": "Uncommon",
+    "cost": 4,
+    "effect": {
+      "type": "LevelUp",
+      "target": "Flush",
+      "chips": 35,
+      "mult": 4
+    },
+    "description": "Level up Flush. +4 Mult and +35 Chips."
+  },
+  {
+    "id": "book_full_house",
+    "name": "Guide to Full House",
+    "rarity": "Uncommon",
+    "cost": 4,
+    "effect": {
+      "type": "LevelUp",
+      "target": "Full House",
+      "chips": 40,
+      "mult": 4
+    },
+    "description": "Level up Full House. +4 Mult and +40 Chips."
+  },
+  {
+    "id": "book_four_kind",
+    "name": "Guide to Four of a Kind",
+    "rarity": "Rare",
+    "cost": 5,
+    "effect": {
+      "type": "LevelUp",
+      "target": "Four of a Kind",
+      "chips": 60,
+      "mult": 7
+    },
+    "description": "Level up Four of a Kind. +7 Mult and +60 Chips."
+  },
+  {
+    "id": "book_straight_flush",
+    "name": "Guide to Straight Flush",
+    "rarity": "Rare",
+    "cost": 5,
+    "effect": {
+      "type": "LevelUp",
+      "target": "Straight Flush",
+      "chips": 100,
+      "mult": 8
+    },
+    "description": "Level up Straight Flush. +8 Mult and +100 Chips."
+  },
+  {
+    "id": "book_royal_flush",
+    "name": "Guide to Royal Flush",
+    "rarity": "Rare",
+    "cost": 5,
+    "effect": {
+      "type": "LevelUp",
+      "target": "Royal Flush",
+      "chips": 120,
+      "mult": 10
+    },
+    "description": "Level up Royal Flush. +10 Mult and +120 Chips."
+  }
+]

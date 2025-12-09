@@ -114,7 +114,7 @@ pub fn apply_relic_bonuses(stats: &mut BaseModifiers, hand: &[Card]) {
     let relics = stats.equipped_relics.clone();
 
     for relic in relics {
-        match relic.id.as_str() {
+        match relic.data.id.as_str() {
             "j_joker" => {
                 stats.mult += 4;
             },

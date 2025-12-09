@@ -1,7 +1,14 @@
 use raylib::prelude::*;
 use std::collections::HashMap;
 
+use crate::structures::relic::GameRelic;
+use crate::structures::consumable::Consumable; // NEW
+use crate::structures::heirloom::Heirloom;     // NEW
+use crate::structures::enemy::Enemy;           // NEW
+use crate::structures::stats::Rune;
+
 pub struct GameAssets {
+    pub tex_card_back: Texture2D,
     pub tex_spritesheet: Texture2D,
     pub tex_background: Texture2D,
     pub tex_banner: Texture2D,
@@ -19,19 +26,30 @@ pub struct GameAssets {
     pub rune_icons: HashMap<String, Texture2D>,
     // Store Relic Icons
     pub relic_icons: HashMap<String, Texture2D>,
+
+    // Databases (Loaded via JSON later)
+    pub relics_db: HashMap<String, GameRelic>,
+    pub consumables_db: HashMap<String, Consumable>,
+    pub heirlooms_db: HashMap<String, Heirloom>,
+    pub enemies_db: HashMap<String, Enemy>,
+    pub runes_db: HashMap<String, Rune>,
 }
 
 impl GameAssets {
     pub fn load(rl: &mut RaylibHandle, thread: &RaylibThread) -> Self {
         // 1. Load Standard Assets
-        // FIX: Removed 'mut' here
         let tex_spritesheet = rl.load_texture(thread, "assets/resprite-cards/spritesheet.png")
             .expect("Failed to load spritesheet.");
+
+        // Placeholder for card back (using spritesheet or a specific file if you have one)
+        let tex_card_back = rl.load_texture(thread, "assets/resprite-cards/spritesheet.png")
+            .expect("Failed to load card back.");
 
         let tex_background = rl.load_texture(thread, "assets/Final_bg.png")
             .or_else(|_| rl.load_texture(thread, "assets/bg/Final_bg.png"))
             .expect("Failed to load background.");
 
+        // UI Assets
         let banner_path = "assets/ui/UI_Flat_Banner04a.png";
         let tex_banner = rl.load_texture(thread, banner_path).expect("Failed to load UI banner");
 
@@ -41,12 +59,13 @@ impl GameAssets {
         let disc_path = "assets/ui/UI_Flat_Bar07a.png";
         let tex_btn_discard = rl.load_texture(thread, disc_path).expect("Failed to load Discard button");
 
+        // Re-using paths for active/disabled states for now, replace with real assets if you have them
         let tex_btn_plus_active = rl.load_texture(thread, play_path).unwrap();
         let tex_btn_plus_disabled = rl.load_texture(thread, disc_path).unwrap();
         let tex_panel_blue = rl.load_texture(thread, banner_path).unwrap();
         let tex_panel_orange = rl.load_texture(thread, banner_path).unwrap();
 
-        // FIX: Directly expect the font
+        // Font
         let font_main = rl.load_font(thread, "assets/fonts/BoldPixels.ttf")
             .expect("Failed to load font: assets/fonts/BoldPixels.ttf");
 
@@ -88,8 +107,10 @@ impl GameAssets {
                 println!("> Warning: Relic Icon not found: {}", path);
             }
         }
-        
+
+        // 4. Construct Final Struct
         Self {
+            tex_card_back,
             tex_spritesheet,
             tex_background,
             tex_banner,
@@ -102,6 +123,13 @@ impl GameAssets {
             font_main,
             rune_icons,
             relic_icons,
+
+            // --- NEW FIELDS INIT (Empty Maps) ---
+            relics_db: HashMap::new(),
+            consumables_db: HashMap::new(),
+            heirlooms_db: HashMap::new(),
+            enemies_db: HashMap::new(),
+            runes_db: HashMap::new(),
         }
     }
 }

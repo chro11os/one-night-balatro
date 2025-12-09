@@ -1,10 +1,15 @@
 use raylib::prelude::*;
 use serde::{Serialize, Deserialize};
+use std::collections::HashMap;
 use crate::structures::state::GameState;
 use crate::structures::hand::HandRank;
-use crate::structures::data_loader::{EnemyData, RelicData};
+use crate::logic::metrics::GameMetrics;
 use rand::{self, Rng};
-use crate::logic::metrics::GameMetrics; // Import GameMetrics
+
+use crate::structures::relic::GameRelic;
+use crate::structures::consumable::Consumable;
+use crate::structures::heirloom::Heirloom;
+use crate::structures::enemy::Enemy;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum RuneType {
@@ -63,56 +68,70 @@ pub struct BaseModifiers {
     pub xp: i32,
     pub xp_target: i32,
     pub stat_points: i32,
+    pub round: i32,
+    pub ante: i32,
+    pub enemies_defeated: i32,
+    pub round_won: bool,
+
     pub current_hp: i32,
     pub max_hp: i32,
     pub money: i32,
     pub hands_remaining: i32,
     pub discards_remaining: i32,
     pub hand_size: i32,
-    pub ante: i32,
-    pub round: i32,
-    pub enemies_defeated: i32,
-    pub round_won: bool,
-    pub crit_chance: f32,
-    pub crit_mult: f32,
+
     pub chips: i32,
     pub mult: i32,
     pub total_score: i32,
-    pub round_score: i32, // To track score for the current round
+    pub round_score: i32,
     pub display_score: f32,
     pub target_score: i32,
+    pub crit_chance: f32,
+    pub crit_mult: f32,
+    pub is_crit_active: bool,
+
     pub deck_count: i32,
     pub hand_rank: Option<HandRank>,
+    pub current_hand_text: String,
+
+    pub current_enemy: Option<Enemy>,
     pub enemy_name: String,
     pub enemy_damage: i32,
     pub active_ability: BossAbility,
+
+    pub consumables: Vec<Consumable>,
+    pub heirlooms: Vec<Heirloom>,
+    pub interest_cap: i32,
+    pub equipped_relics: Vec<GameRelic>,
+    pub current_shop_relics: Vec<GameRelic>,
     pub equipped_runes: Vec<Rune>,
-    pub available_runes: Vec<Rune>,
-    pub equipped_relics: Vec<RelicData>,
-    pub enemy_database: Option<EnemyData>,
-    pub all_relics: Vec<RelicData>, // Renamed from relic_database
-    pub current_shop_relics: Vec<RelicData>, // For the shop
+    pub available_runes: Vec<Rune>, // <--- RESTORED THIS
+
+    // Databases
+    pub enemy_database: Option<HashMap<String, Enemy>>,
+    pub all_relics: HashMap<String, GameRelic>,
+    pub all_consumables: HashMap<String, Consumable>,
+    pub all_heirlooms: HashMap<String, Heirloom>,
+
     pub floating_texts: Vec<FloatingText>,
     pub particles: Vec<Particle>,
     pub previous_state: GameState,
     pub current_sort: SortMode,
-    // pub screen_shake: Vector2, // Removed, replaced by trauma system
-    // pub shake_timer: f32, // Removed, replaced by trauma system
-    pub is_crit_active: bool,
+
     pub score_index: usize,
     pub score_timer: f32,
     pub discard_index: usize,
     pub discard_timer: f32,
     pub score_delay: f32,
+
     pub shop_price_mult: f32,
     pub ante_scaling: f32,
+    pub shop_y_offset: f32,
 
-    // NEW: Trauma-based screen shake
     pub trauma: f32,
     pub shake_offset: Vector2,
     pub shake_rotation: f32,
 
-    // NEW: Cached Text for UI to reduce allocations
     pub hands_remaining_text: String,
     pub discards_remaining_text: String,
     pub chips_text: String,
@@ -127,8 +146,6 @@ pub struct BaseModifiers {
     pub crit_chance_stat_text: String,
     pub crit_mult_stat_text: String,
 
-
-    // NEW: Flash timer for enemy damage animation
     pub damage_flash_timer: f32,
     pub window_y_offset: f32,
     pub input_consumed: bool,
@@ -138,26 +155,47 @@ pub struct BaseModifiers {
 impl Default for BaseModifiers {
     fn default() -> Self {
         Self {
-            level: 1, xp: 0, xp_target: 100, stat_points: 0, current_hp: 100, max_hp: 100, money: 10,
-            hands_remaining: 4, discards_remaining: 5, hand_size: 8, ante: 1, round: 1, enemies_defeated: 0, round_won: false,
-            crit_chance: 0.10, crit_mult: 1.5, chips: 0, mult: 0, total_score: 0, round_score: 0, display_score: 0.0, target_score: 300,
+            level: 1, xp: 0, xp_target: 100, stat_points: 0,
+            round: 1, ante: 1, enemies_defeated: 0, round_won: false,
+
+            current_hp: 100, max_hp: 100,
+            money: 4,
+            interest_cap: 25,
+
+            hands_remaining: 4, discards_remaining: 5, hand_size: 8,
+
+            chips: 0, mult: 0, total_score: 0, round_score: 0, display_score: 0.0, target_score: 300,
+            crit_chance: 0.10, crit_mult: 1.5, is_crit_active: false,
+
             deck_count: 52, hand_rank: None,
-            enemy_name: "Giant Rat".to_string(), enemy_damage: 10, active_ability: BossAbility::None,
-            equipped_runes: Vec::new(), available_runes: Vec::new(), equipped_relics: Vec::new(),
-            enemy_database: None, all_relics: Vec::new(), current_shop_relics: Vec::new(),
+            current_hand_text: String::new(),
+
+            current_enemy: None,
+            enemy_name: "Giant Rat".to_string(),
+            enemy_damage: 10,
+            active_ability: BossAbility::None,
+
+            consumables: Vec::new(),
+            heirlooms: Vec::new(),
+            equipped_relics: Vec::new(),
+            current_shop_relics: Vec::new(),
+            equipped_runes: Vec::new(),
+            available_runes: Vec::new(), // <--- RESTORED INIT
+
+            enemy_database: None,
+            all_relics: HashMap::new(),
+            all_consumables: HashMap::new(),
+            all_heirlooms: HashMap::new(),
+
             floating_texts: Vec::new(), particles: Vec::new(),
             previous_state: GameState::Menu, current_sort: SortMode::Rank,
-            // screen_shake: Vector2::zero(), // Removed
-            // shake_timer: 0.0, // Removed
-            is_crit_active: false, score_index: 0, score_timer: 0.0, discard_index: 0, discard_timer: 0.0, score_delay: 0.0,
+
+            score_index: 0, score_timer: 0.0, discard_index: 0, discard_timer: 0.0, score_delay: 0.0,
             shop_price_mult: 1.0, ante_scaling: 1.5,
+            shop_y_offset: 0.0,
 
-            // Init trauma-based screen shake
-            trauma: 0.0,
-            shake_offset: Vector2::zero(),
-            shake_rotation: 0.0,
+            trauma: 0.0, shake_offset: Vector2::zero(), shake_rotation: 0.0,
 
-            // Init cached text fields
             hands_remaining_text: String::new(),
             discards_remaining_text: String::new(),
             chips_text: String::new(),
@@ -172,8 +210,6 @@ impl Default for BaseModifiers {
             crit_chance_stat_text: String::new(),
             crit_mult_stat_text: String::new(),
 
-
-            // Init new field
             damage_flash_timer: 0.0,
             window_y_offset: 0.0,
             input_consumed: false,
@@ -189,19 +225,12 @@ impl BaseModifiers {
 
     pub fn update_screen_shake(&mut self, dt: f32) {
         if self.trauma > 0.0 {
-            // Decay trauma linearly
             self.trauma = (self.trauma - dt).max(0.0);
-
-            // Calculate shake intensity (trauma^2)
             let shake_intensity = self.trauma * self.trauma;
-
-            // Generate random offset for X and Y, scaled by intensity
             let shake_x = (rand::thread_rng().gen_range(-1.0..1.0) * 10.0) * shake_intensity;
             let shake_y = (rand::thread_rng().gen_range(-1.0..1.0) * 10.0) * shake_intensity;
             self.shake_offset = Vector2::new(shake_x, shake_y);
-
-            // Generate random rotation, scaled by intensity
-            self.shake_rotation = (rand::thread_rng().gen_range(-1.0..1.0) * 5.0) * shake_intensity; // Max 5 degrees rotation
+            self.shake_rotation = (rand::thread_rng().gen_range(-1.0..1.0) * 5.0) * shake_intensity;
         } else {
             self.shake_offset = Vector2::zero();
             self.shake_rotation = 0.0;
@@ -209,25 +238,18 @@ impl BaseModifiers {
     }
 
     pub fn update_vfx(&mut self, dt: f32) {
-        // Update Damage Flash
-        if self.damage_flash_timer > 0.0 {
-            self.damage_flash_timer -= dt;
-        }
-
-        // Update Floating Text
+        if self.damage_flash_timer > 0.0 { self.damage_flash_timer -= dt; }
         self.floating_texts.retain_mut(|ft| {
             ft.life -= dt;
             ft.pos += ft.vel * dt;
-            ft.vel.y *= 0.95; // Drag
+            ft.vel.y *= 0.95;
             ft.life > 0.0
         });
-
-        // Update Particles
         self.particles.retain_mut(|p| {
             p.life -= dt;
             p.pos += p.vel * dt;
             p.rotation += p.rot_speed * dt;
-            p.vel.y += 800.0 * dt; // Gravity
+            p.vel.y += 800.0 * dt;
             p.life > 0.0
         });
     }
@@ -240,19 +262,15 @@ impl BaseModifiers {
         self.hp_text = format!("{}/{}", self.current_hp, self.max_hp);
         self.money_text = format!("$ {}", self.money);
         self.level_text = format!("{}", self.level);
-        
         let remaining_hp = (self.target_score - self.display_score as i32).max(0);
         self.enemy_hp_text = format!("{} / {}", remaining_hp, self.target_score);
-
         self.current_round_text = format!("Round {}", self.round);
         self.stat_points_text = format!("Points Available: {}", self.stat_points);
-
         self.max_hp_stat_text = format!("{}", self.max_hp);
         self.crit_chance_stat_text = format!("{:.0}%", self.crit_chance * 100.0);
         self.crit_mult_stat_text = format!("{:.1}x", self.crit_mult);
     }
 
-    // Resource Management Methods
     pub fn decrement_hands(&mut self, amount: i32) -> Result<(), String> {
         if self.hands_remaining >= amount {
             self.hands_remaining -= amount;
@@ -273,14 +291,13 @@ impl BaseModifiers {
 
     pub fn add_money(&mut self, amount: i32) {
         self.money += amount;
-        // Optionally, clamp money to a max value
     }
 }
 
 pub fn spawn_floating_text(stats: &mut BaseModifiers, text: String, pos: Vector2, color: Color) {
     stats.floating_texts.push(FloatingText {
         pos,
-        vel: Vector2::new(0.0, -100.0), // Shoot up
+        vel: Vector2::new(0.0, -100.0),
         text,
         color,
         size: 40,
@@ -295,15 +312,8 @@ pub fn spawn_particle_burst(stats: &mut BaseModifiers, pos: Vector2, color: Colo
         let speed = unsafe { raylib::ffi::GetRandomValue(150, 400) } as f32;
         let vel = Vector2::new(angle.cos() * speed, angle.sin() * speed);
         let size = unsafe { raylib::ffi::GetRandomValue(6, 14) } as f32;
-
         stats.particles.push(Particle {
-            pos,
-            vel,
-            color,
-            size,
-            life: 0.6,
-            max_life: 0.6,
-            rotation: 0.0,
+            pos, vel, color, size, life: 0.6, max_life: 0.6, rotation: 0.0,
             rot_speed: unsafe { raylib::ffi::GetRandomValue(-300, 300) } as f32,
         });
     }
